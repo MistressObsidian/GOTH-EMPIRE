@@ -3,3 +3,7 @@ data/
 .env.*
 !.env.example
 node_modules/
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*

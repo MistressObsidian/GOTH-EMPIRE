@@ -11,15 +11,12 @@ import { readRuntimeConfig } from './runtime.mjs';
 import { safeMember, portalGet, portalPost, seal } from './portal.mjs';
 import { plans } from './js/membership.js';
 
-const root = dirname(fileURLToPath(import.meta.url));
 const derive = promisify(scrypt);
-export async function createApp(databaseOptions, { config = readRuntimeConfig(), database, paymentEmailSender = createPaymentEmailSender() } = {}) {
-  const db = database || await openDatabase(databaseOptions);
+export function createRequestHandler(db, { config = readRuntimeConfig(), paymentEmailSender = createPaymentEmailSender(), attempts = new Map(), readPublicFile = path => readFile(join(dirname(fileURLToPath(import.meta.url)), path.slice(1))) } = {}) {
   const t = db.tables;
-  const attempts = new Map();
   const digest = token => createHash('sha256').update(token).digest('hex');
   const publicUser = safeMember;
-  const server = createServer(async (req, res) => {
+  return async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -144,7 +141,7 @@ export async function createApp(databaseOptions, { config = readRuntimeConfig(),
       }
       if (!/^\/(index|login|register|dashboard|checkout|admin)\.html$/.test(path) && !/^\/(css|js|images)\/[a-zA-Z0-9_./-]+$/.test(path)) return send(404, { error: 'Not found.' });
       if (path.split('/').some(segment => segment.startsWith('.'))) return send(404, { error: 'Not found.' });
-      const content = await readFile(join(root, path.slice(1)));
+      const content = await readPublicFile(path);
       const ext = path.split('.').pop();
       const types = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };
       res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -159,7 +156,12 @@ export async function createApp(databaseOptions, { config = readRuntimeConfig(),
       }
       send(error.code === 'ENOENT' ? 404 : 500, { error: error.code === 'ENOENT' ? 'Not found.' : 'Unable to complete your request. Please try again.' });
     }
-  });
+  };
+}
+
+export async function createApp(databaseOptions, { database, config = readRuntimeConfig(), ...options } = {}) {
+  const db = database || await openDatabase(databaseOptions);
+  const server = createServer(createRequestHandler(db, { ...options, config }));
   server.on('close', () => { void db.close(); });
   server.shutdown = async () => {
     if (server.listening) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

@@ -3,6 +3,17 @@ Goth Empire - Neon PostgreSQL backend
 Requires Node.js 22.16 or newer.
 See DEPLOYMENT.md for hosting settings, preview routes, cleanup notes, and outstanding launch requirements.
 
+Cloudflare Workers:
+  The committed wrangler.jsonc builds only public website files into dist/.
+  Deploy command: npm run deploy (or npx wrangler deploy).
+  Leave the Cloudflare build command empty; Wrangler runs the asset build itself.
+  Set APP_ORIGIN, DATABASE_URL_POOLED and the existing PORTAL_DATA_KEY in Worker runtime settings.
+  Automatic email additionally needs RESEND_API_KEY and PAYMENT_EMAIL_FROM.
+  Use Workers Paid for the backend's existing scrypt password hashing.
+  npm.cmd run deploy:check validates packaging without publishing.
+  npm.cmd run test:cloudflare checks the local Workers runtime without live database/email calls.
+  Full setup and verification steps are in DEPLOYMENT.md.
+
 Start the app:
   npm.cmd ci
   npm.cmd start

@@ -1,6 +1,53 @@
 # Deployment and review
 
-Deploy this application as a Node.js web service. The same server serves the public pages and `/api/*` routes. Use Node.js 22.16 or newer, install with `npm ci --omit=dev`, and start with `npm start`. There is no frontend build step.
+The application supports Cloudflare Workers and a conventional Node.js web service. Both use the same account, membership, portal and payment-request handlers with the existing Neon database.
+
+## Cloudflare Workers
+
+The repository includes `wrangler.jsonc`; keep it committed along with `package.json`, `package-lock.json`, `cloudflare/`, `scripts/build-cloudflare.mjs`, and the shared application files. The Worker is named `goth-empire`, matching the deployment in the reported build log.
+
+Published Worker address: https://goth-empire.muddy-truth-c7b9.workers.dev. Use this as `APP_ORIGIN` until a custom domain is connected.
+
+Use these settings in the connected Cloudflare build:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | Repository root |
+| Build command | Leave empty; Wrangler runs the configured public-file build |
+| Deploy command | `npm run deploy` (the existing `npx wrangler deploy` also reads this configuration) |
+| Dependency installation | `npm ci`, including development dependencies |
+
+Wrangler now builds `dist/` from an explicit list of HTML pages and the `css/`, `js/` and `images/` folders. It uploads that directory instead of the repository root. `node_modules/workerd`, `.env`, server modules, tests, documentation and recovery data are excluded. The build checks that every public file fits Cloudflare's 25 MiB asset limit. `dist/` is generated and should not be committed.
+
+The Worker handles `/api/*`, `/admin`, `/admin.html`, `/dashboard` and `/dashboard.html` before serving any asset. It preserves the existing password hashes, secure session cookies, paid-membership gate and administrator checks. Database pools are opened and closed within each request so sockets are never shared across Worker requests. Public pages remain available when account settings are missing; account operations return 503 until configured.
+
+In **Workers & Pages → goth-empire → Settings → Variables and Secrets**, configure the deployed Worker's runtime settings:
+
+| Setting | Value |
+| --- | --- |
+| `APP_ORIGIN` | The exact public HTTPS site origin, such as your Worker URL or custom domain, with no path |
+| `DATABASE_URL_POOLED` | Secret: the existing private Neon pooled connection string |
+| `PORTAL_DATA_KEY` | Secret: preserve the existing 64-character hexadecimal encryption key |
+| `RESEND_API_KEY` | Secret: required for automatic payment-request email |
+| `PAYMENT_EMAIL_FROM` | Sender address authorized by Resend; required with the email API key |
+
+These belong to the Worker runtime, not only its build environment. The local `.env` is not uploaded or automatically converted to deployed secrets. Production mode and secure cookies are enabled by the Worker adapter. Do not set `COOKIE_SECURE=false`. `keep_vars` preserves dashboard-configured variables during deployment. No `PORT` or `HOST` is needed on Workers.
+
+Use **Workers Paid** for the full backend: the existing scrypt password hashing can exceed Workers Free's 10 ms CPU limit. Preserve the password hashing settings rather than reducing their strength to fit the Free plan. See [Cloudflare CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time).
+
+Local validation:
+
+* `npm run deploy:check` builds and packages the Worker without publishing it.
+* `npm run test:cloudflare` checks public assets, protected/encoded page routes, login and secure cookies, origin rejection, concurrent request isolation and database failures in the real local Workers runtime using a fake database. It does not contact Neon or send email.
+* `npm run preview:cloudflare` starts a local Worker preview. Wrangler reads local `.dev.vars` or `.env` for bindings; use `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false` to disable `.env` loading when checking public pages without backend credentials. Login requires the configured HTTPS `APP_ORIGIN`; the HTTP preview is not proof of production login behavior.
+
+After pushing the changes, retry the Cloudflare deployment. Check the deployed `/api/health`, registration/login, secure sessions, protected dashboards and payment-request flow on its actual HTTPS origin. A dry run and mocked runtime tests do not verify deployed secrets, live Neon connectivity or email delivery.
+
+Cloudflare references: [static asset configuration](https://developers.cloudflare.com/workers/static-assets/binding/), [Node HTTP adapter](https://developers.cloudflare.com/workers/runtime-apis/nodejs/http/), [PostgreSQL connections](https://developers.cloudflare.com/workers/tutorials/postgres/).
+
+## Node.js web service
+
+The same server serves the public pages and `/api/*` routes. Use Node.js 22.16 or newer, install with `npm ci --omit=dev`, and start with `npm start`. There is no frontend build step for this hosting option.
 
 Set these backend environment variables on the host:
 
