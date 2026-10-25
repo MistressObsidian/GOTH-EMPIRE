@@ -1,5 +1,6 @@
 import { tiers, tierFor, formatPrice } from './membership.js';
 import { paymentPreference, paymentReplyEmail, paymentEmailStatusMessage } from './payment-contact.js';
+import { initMemberNavigation } from './member-navigation.js';
 
 export function initPortal(options = {}) {
   const window = options.window || globalThis.window;
@@ -7,7 +8,14 @@ export function initPortal(options = {}) {
   const request = options.fetch || ((...args) => window.fetch(...args));
   const root = document.querySelector('#portal-root');
   const status = document.querySelector('#portal-status');
+  const memberPage = document.body.classList.contains('member-dashboard');
+  const navigate = options.navigate || (href => window.location.replace(href));
   let data;
+  let disposed = false, lastUnread = -1, notificationRevision = 0;
+  let notificationPoll, messageRefresh, readAcknowledgment;
+  const navigation = memberPage ? initMemberNavigation({ window, onSelect(id) {
+    if (id === 'messages' && data) void refreshMessages().catch(notificationError);
+  } }) : null;
   const el = (tag, copy, className) => {
     const node = document.createElement(tag);
     if (copy !== undefined) node.textContent = copy;
@@ -19,7 +27,9 @@ export function initPortal(options = {}) {
   const slotLabel = slot => `${when(slot.starts_at)} · ${slot.format} · ${slot.duration} min · ${slot.area || 'Online'}`;
   const section = (id, heading, description) => {
     const node = el('section', undefined, 'portal-section'); node.id = id;
-    node.append(el('h2', heading)); if (description) node.append(el('p', description, 'muted'));
+    if (memberPage) { node.dataset.portalView = id; node.hidden = navigation.current !== id; node.setAttribute('aria-labelledby', 'member-view-title'); }
+    else node.append(el('h2', heading));
+    if (description) node.append(el('p', description, 'muted'));
     root.append(node); return node;
   };
   const field = (form, name, caption, type = 'text', value = '', choices) => {
@@ -94,10 +104,12 @@ export function initPortal(options = {}) {
     for (const [label, value, href] of [
       ['Upcoming appointments', upcoming.length, '#sessions'],
       ['Awaiting action', pending.length, '#sessions'],
-      ['Messages remaining', Math.max(0, data.messageAllowance.limit - data.messageAllowance.used), '#messages']
+      ['Unread private messages', data.unreadMessages || 0, '#messages']
     ]) {
       const card = el('a', undefined, 'overview-stat'); card.href = href;
-      card.append(el('span', String(value), 'stat'), el('span', label)); stats.append(card);
+      const total = el('span', String(value), 'stat');
+      if (href === '#messages') total.dataset.unreadTotal = '';
+      card.append(total, el('span', label)); stats.append(card);
     }
     overview.append(stats);
     const next = el('section', undefined, 'record next-appointment');
@@ -201,14 +213,28 @@ export function initPortal(options = {}) {
       area.append(card);
     }
   }
+  function renderMessageList(area, admin) {
+    const list = area.querySelector('.message-list');
+    list.replaceChildren();
+    if (!data.messages.length) list.append(el('p', 'No private messages yet.', 'empty'));
+    for (const message of data.messages) {
+      const unread = !admin && message.sender === 'mistress' && !message.member_read_at;
+      const card = el('article', undefined, `record message-record${unread ? ' message-unread' : ''}`);
+      card.dataset.messageId = message.id;
+      const heading = el('div', undefined, 'message-heading');
+      heading.append(el('h3', `${message.sender === 'mistress' ? 'The Mistress' : message.name}${admin ? ' · ' + message.name : ''}`), el('small', when(message.created_at)));
+      if (unread) heading.append(el('span', 'New', 'badge message-new'));
+      card.append(heading, el('p', message.body)); list.append(card);
+    }
+  }
   function renderMessages(admin) {
     const area = section('messages', admin ? 'Private Conversations' : 'Private Messages', data.responseWindow);
-    if (!admin) area.append(el('p', `${data.messageAllowance.used} of ${data.messageAllowance.limit} messages used this calendar month (UTC).`));
-    if (!data.messages.length) area.append(el('p', 'No private messages yet.', 'empty'));
-    for (const message of data.messages) {
-      const card = el('article', undefined, 'record');
-      card.append(el('h3', `${message.sender === 'mistress' ? 'The Mistress' : message.name}${admin ? ' · ' + message.name : ''}`), el('small', when(message.created_at)), el('p', message.body)); area.append(card);
+    if (!admin) {
+      area.append(el('p', `${data.messageAllowance.used} of ${data.messageAllowance.limit} messages used this calendar month (UTC).`, 'message-allowance'));
+      button(area, 'Refresh messages', refreshMessages, true);
     }
+    area.append(el('div', undefined, 'message-list'));
+    renderMessageList(area, admin);
     if (admin && !data.members.filter(m => m.role !== 'admin').length) return;
     if (!admin && data.messageAllowance.used >= data.messageAllowance.limit) { area.append(el('p', 'No messages available on your current allowance. You can still read your conversation history.')); return; }
     const f = form(area, 'message', 'Send private message');
@@ -328,14 +354,106 @@ export function initPortal(options = {}) {
       if (alert) alert.textContent = 'Unable to refresh payment notifications. Refresh the payment inbox to try again.';
     }
   }
+  function notificationError() {
+    if (disposed) return;
+    const note = document.querySelector('#message-notification-status');
+    if (note) note.textContent = 'Message notifications could not refresh. Open Private Messages and select Refresh messages to try again.';
+  }
+  function updateMessageCount(count) {
+    if (!Number.isInteger(count) || count < 0) throw new Error('Invalid message notification.');
+    for (const badge of document.querySelectorAll('[data-unread-count]')) { badge.textContent = String(count); badge.hidden = count === 0; }
+    for (const total of document.querySelectorAll('[data-unread-total]')) total.textContent = String(count);
+    for (const link of document.querySelectorAll('[data-message-link]')) link.setAttribute('aria-label', `Private Messages, ${count} unread`);
+    const announcement = document.querySelector('#message-announcement');
+    if (announcement && count !== lastUnread && (lastUnread !== -1 || count > 0)) announcement.textContent = count ? `${count} unread private message${count === 1 ? '' : 's'} from the Mistress.` : 'Your private messages are up to date.';
+    lastUnread = count;
+    const note = document.querySelector('#message-notification-status');
+    if (note) note.textContent = '';
+  }
+  function sessionEnded(response) {
+    if (![401, 402, 403].includes(response.status)) return false;
+    data = null;
+    root.replaceChildren();
+    const overview = document.querySelector('#overview');
+    if (memberPage && overview) { overview.replaceChildren(); overview.hidden = true; }
+    updateMessageCount(0);
+    navigate(response.status === 402 ? 'checkout.html' : 'login.html');
+    return true;
+  }
+  function acknowledgeMessages() {
+    if (disposed || document.hidden || navigation?.current !== 'messages' || !data || data.user.role === 'admin') return Promise.resolve();
+    if (readAcknowledgment) return readAcknowledgment;
+    const ids = data.messages.filter(message => message.sender === 'mistress' && !message.member_read_at).map(message => message.id);
+    if (!ids.length) return Promise.resolve();
+    notificationRevision++;
+    readAcknowledgment = (async () => {
+      try {
+        for (let offset = 0; offset < ids.length; offset += 200) {
+          if (disposed || document.hidden || navigation.current !== 'messages') break;
+          const batch = ids.slice(offset, offset + 200);
+          const response = await request('/api/portal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'messages-read', ids: batch }) });
+          if (disposed || sessionEnded(response)) return;
+          const result = await response.json();
+          if (!response.ok || result.success !== true || !Number.isInteger(result.unreadMessages) || result.unreadMessages < 0) throw new Error('Unable to confirm read messages.');
+          for (const message of data.messages) if (batch.includes(message.id)) message.member_read_at = true;
+          data.unreadMessages = result.unreadMessages;
+          updateMessageCount(result.unreadMessages);
+          for (const card of document.querySelectorAll('#messages [data-message-id]')) if (batch.includes(card.dataset.messageId)) {
+            card.classList.remove('message-unread'); card.querySelector('.message-new')?.remove();
+          }
+        }
+      } catch { notificationError(); }
+      finally { notificationRevision++; readAcknowledgment = null; }
+    })();
+    return readAcknowledgment;
+  }
+  function refreshMessages() {
+    if (disposed || !data || !memberPage) return Promise.resolve();
+    if (messageRefresh) return messageRefresh;
+    messageRefresh = (async () => {
+      try {
+        const response = await request('/api/portal/messages');
+        if (disposed || sessionEnded(response)) return;
+        const result = await response.json();
+        if (!response.ok || !Array.isArray(result.messages)) throw new Error('Unable to refresh messages.');
+        data.messages = result.messages;
+        data.messageAllowance = result.messageAllowance;
+        data.unreadMessages = result.unreadMessages;
+        renderMessageList(document.querySelector('#messages'), false);
+        document.querySelector('.message-allowance').textContent = `${data.messageAllowance.used} of ${data.messageAllowance.limit} messages used this calendar month (UTC).`;
+        updateMessageCount(result.unreadMessages);
+        await acknowledgeMessages();
+      } finally { messageRefresh = null; }
+    })();
+    return messageRefresh;
+  }
+  function checkMessageNotifications() {
+    if (disposed || document.hidden || !data || !memberPage || data.user.role === 'admin') return Promise.resolve();
+    if (notificationPoll) return notificationPoll;
+    const revision = notificationRevision;
+    notificationPoll = (async () => {
+      try {
+        if (navigation.current === 'messages') { await refreshMessages(); return; }
+        const response = await request('/api/portal/notifications');
+        if (disposed || sessionEnded(response)) return;
+        const result = await response.json();
+        if (!response.ok) throw new Error('Unable to refresh notifications.');
+        // A poll started before a read acknowledgment must not restore an old count.
+        if (revision !== notificationRevision) return;
+        data.unreadMessages = result.unreadMessages;
+        updateMessageCount(result.unreadMessages);
+      } catch { notificationError(); }
+      finally { notificationPoll = null; }
+    })();
+    return notificationPoll;
+  }
   document.querySelector('#review-payment-requests')?.addEventListener('click', async event => {
     event.preventDefault(); await load(); document.querySelector('#payment-requests')?.scrollIntoView?.({ block: 'start' });
   });
   async function load() {
     try {
       const response = await request('/api/portal');
-      if (response.status === 401) { window.location.replace('login.html'); return; }
-      if (response.status === 402) { window.location.replace('checkout.html'); return; }
+      if (disposed || sessionEnded(response)) return;
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Unable to load your private space.');
       data = result;
@@ -345,7 +463,9 @@ export function initPortal(options = {}) {
       if (!admin) renderOverview();
       if (admin) { updatePaymentAlert(data.paymentRequests.filter(request => request.status === 'pending_instructions').length); renderPaymentRequests(); renderAdmin(); } else renderMember();
       renderSessions(admin); renderMessages(admin); renderContent(admin); renderPayments(admin); renderProfile();
+      if (memberPage) { navigation.refresh(); updateMessageCount(data.unreadMessages || 0); }
       root.setAttribute('aria-busy', 'false');
+      if (memberPage) await acknowledgeMessages();
     } catch (error) {
       root.replaceChildren(); root.setAttribute('aria-busy', 'false');
       const overview = document.querySelector('#member-overview');
@@ -353,10 +473,14 @@ export function initPortal(options = {}) {
       report(error.message || 'Unable to load your private space. Please refresh.');
     }
   }
-  if (document.body.dataset.admin === 'true') {
-    const timer = window.setInterval(checkPaymentNotifications, 30000);
-    window.addEventListener('pagehide', () => window.clearInterval(timer), { once: true });
+  const timer = window.setInterval(memberPage ? checkMessageNotifications : checkPaymentNotifications, 30000);
+  const visibilityChange = () => { if (!document.hidden) void checkMessageNotifications(); };
+  if (memberPage) document.addEventListener('visibilitychange', visibilityChange);
+  function destroy() {
+    disposed = true; window.clearInterval(timer); navigation?.destroy();
+    document.removeEventListener('visibilitychange', visibilityChange);
   }
-  return { ready: load(), checkPaymentNotifications };
+  window.addEventListener('pagehide', destroy, { once: true });
+  return { ready: load(), checkPaymentNotifications, checkMessageNotifications, refreshMessages, acknowledgeMessages, navigation, destroy };
 }
 if (typeof document !== 'undefined') initPortal();

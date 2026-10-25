@@ -7,17 +7,29 @@
   <link rel="stylesheet" href="css/theme.css">
 </head>
 <body class="member-dashboard">
-<aside class="portal-sidebar">
+<header class="member-appbar">
 <a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
+<div class="member-appbar-actions">
+<a href="#messages" class="message-shortcut" data-message-link>Messages <span class="unread-count" data-unread-count hidden>0</span></a>
+<button id="member-menu-toggle" type="button" class="secondary" aria-controls="member-menu" aria-expanded="false"><span aria-hidden="true">☰</span> Menu</button>
+</div>
+</header>
+<aside id="member-menu" class="member-menu" hidden>
 <p class="eyebrow">YOUR PRIVATE SPACE</p>
-<nav aria-label="Portal navigation"><a href="#overview">Overview</a><a href="#profile">My Profile</a><a href="#membership">My Membership</a><a href="#book">Book a Session</a><a href="#sessions">Session Records</a><a href="#messages">Private Messages</a><a href="#content">Exclusive Content</a><a href="#payments">Payments</a></nav>
+<nav aria-label="Portal navigation"><a href="#overview" aria-current="page">Overview</a><a href="#profile">My Profile</a><a href="#membership">My Membership</a><a href="#book">Book a Session</a><a href="#sessions">Session Records</a><a href="#messages" data-message-link>Private Messages <span class="unread-count" data-unread-count hidden>0</span></a><a href="#content">Exclusive Content</a><a href="#payments">Payments</a></nav>
 <a href="index.html#policies">Consent &amp; cancellation</a>
 <button id="logout-btn" type="button" class="secondary">Log Out</button>
 </aside>
-<main class="portal-main">
+<main class="portal-main" id="member-main">
+<p class="eyebrow member-breadcrumb">YOUR PRIVATE SPACE</p>
+<h1 id="member-view-title" tabindex="-1">Overview</h1>
+<p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
+<p id="message-notification-status" class="notification-status" role="status" aria-live="polite"></p>
+<p id="message-announcement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+<section id="overview" data-portal-view="overview">
 <div class="member-topbar">
-<header id="overview">
-  <p class="eyebrow">SUBMISSIVE PORTAL</p><h1>My Private Space</h1>
+<header>
+  <h2>My Private Space</h2>
   <p>Your membership, appointments and private conversations at a glance.</p>
   <section class="dashboard-bio" aria-labelledby="dashboard-bio-title">
     <div class="dashboard-bio-heading"><h2 id="dashboard-bio-title">About me</h2><a href="#profile">Edit profile</a></div>
@@ -34,11 +46,11 @@
   <a class="portal-button secondary" href="#profile">Edit my profile</a>
 </aside>
 </div>
+<div id="member-overview" aria-label="Account overview" aria-busy="true"></div>
+</section>
 <div class="member-layout">
 <div class="member-content">
-<p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
-<div id="member-overview" aria-label="Account overview" aria-busy="true"></div>
-<div id="portal-root" aria-busy="true"><section id="profile"></section><section id="membership"></section><section id="book"></section><section id="sessions"></section><section id="messages"></section><section id="content"></section><section id="payments"></section></div>
+<div id="portal-root" aria-busy="true"><section id="profile" data-portal-view="profile" hidden></section><section id="membership" data-portal-view="membership" hidden></section><section id="book" data-portal-view="book" hidden></section><section id="sessions" data-portal-view="sessions" hidden></section><section id="messages" data-portal-view="messages" hidden></section><section id="content" data-portal-view="content" hidden></section><section id="payments" data-portal-view="payments" hidden></section></div>
 </div>
 </div>
 </main>

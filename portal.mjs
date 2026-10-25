@@ -26,6 +26,21 @@ export function memberTier(user) {
 }
 export const safeMember = user => ({ id: user.id, name: user.name, email: user.email, role: user.role || 'member', tier: memberTier(user).id, membershipUntil: user.membership_until, selectedPlan: user.selected_plan, adultConfirmed: user.adult_confirmed === true, suspended: user.suspended === true, customMessageLimit: user.custom_message_limit });
 
+async function unreadMessages(db, userId) {
+  return (await db.query(`SELECT count(*)::int AS unread FROM ${db.tables.messages} WHERE user_id=$1 AND sender='mistress' AND member_read_at IS NULL`, [userId])).rows[0].unread;
+}
+
+async function messageState(db, user, admin, tier) {
+  const messages = (await db.query(`SELECT m.*, u.name FROM ${db.tables.messages} m JOIN ${db.tables.users} u ON u.id=m.user_id WHERE ($1 OR m.user_id=$2) ORDER BY m.created_at,m.id`, [admin, user.id])).rows.map(row => ({ ...row, body: unseal(row.body) }));
+  const month = new Date().toISOString().slice(0, 7);
+  const used = messages.filter(message => message.sender === 'member' && message.user_id === user.id && new Date(message.created_at).toISOString().slice(0, 7) === month).length;
+  return {
+    messages, messageAllowance: { limit: tier.messages, used },
+    unreadMessages: messages.filter(message => message.user_id === user.id && message.sender === 'mistress' && !message.member_read_at).length,
+    responseWindow: 'Allow up to 2 business days for a reply. Messaging is not an emergency service.'
+  };
+}
+
 export async function portalGet(db, user, url) {
   if (!user) fail('Please log in.', 401);
   if (user.suspended) fail('Your account is suspended. Contact the Mistress to discuss access.', 403);
@@ -33,6 +48,8 @@ export async function portalGet(db, user, url) {
   const admin = user.role === 'admin';
   const tier = memberTier(user);
   if (!admin && tier.rank < 1) fail('Choose a paid plan and complete payment. Portal access opens after membership activation.', 402);
+  if (url.pathname === '/api/portal/notifications') return { unreadMessages: await unreadMessages(db, user.id) };
+  if (url.pathname === '/api/portal/messages') return messageState(db, user, admin, tier);
   if (url.pathname === '/api/portal/content-file') {
     const row = (await db.query(`SELECT * FROM ${t.content} WHERE id=$1`, [url.searchParams.get('id')])).rows[0];
     if (!row || (!admin && row.min_rank > tier.rank)) fail('Content not available.', 404);
@@ -51,13 +68,12 @@ export async function portalGet(db, user, url) {
     }
     return { ...row, details };
   });
-  const messages = (await db.query(`SELECT m.*, u.name FROM ${t.messages} m JOIN ${t.users} u ON u.id=m.user_id WHERE ($1 OR m.user_id=$2) ORDER BY m.created_at`, [admin, user.id])).rows.map(row => ({ ...row, body: unseal(row.body) }));
+  const conversation = await messageState(db, user, admin, tier);
   const content = (await db.query(`SELECT * FROM ${t.content} WHERE ($1 OR min_rank<=$2) ORDER BY created_at DESC`, [admin, tier.rank])).rows.map(row => {
     const body = unseal(row.body);
     return { ...row, body: body.text, fileName: body.file?.name };
   });
-  const used = messages.filter(message => message.sender === 'member' && message.user_id === user.id && new Date(message.created_at).toISOString().slice(0, 7) === new Date().toISOString().slice(0, 7)).length;
-  const result = { user: safeMember(user), tier, profile: profile ? unseal(profile.details) : {}, availability, bookings, messages, content, messageAllowance: { limit: tier.messages, used }, responseWindow: 'Allow up to 2 business days for a reply. Messaging is not an emergency service.' };
+  const result = { user: safeMember(user), tier, profile: profile ? unseal(profile.details) : {}, availability, bookings, content, ...conversation };
   result.publishedSessions = (await db.query(`SELECT a.id,a.format,a.starts_at,a.duration,a.area,a.min_rank FROM ${t.availability} a WHERE a.enabled AND a.starts_at>now() AND NOT EXISTS(SELECT 1 FROM ${t.bookings} b WHERE b.slot_id=a.id AND b.status='confirmed') ORDER BY a.starts_at`)).rows;
   result.membershipPayments = (await db.query(`SELECT * FROM ${t.membership_payments} WHERE ($1 OR user_id=$2) ORDER BY created_at DESC`, [admin, user.id])).rows.map(row => ({ ...row, reference: unseal(row.reference) }));
   if (admin) {
@@ -79,6 +95,14 @@ export async function portalPost(db, user, body) {
   const requireAdmin = () => { if (!admin) fail('Mistress access required.', 403); };
   const requireAdult = () => { if (!user.adult_confirmed) fail('Confirm adult eligibility in My Profile first.', 403); };
   switch (body.action) {
+    case 'messages-read': {
+      if (admin) fail('Only the receiving member can mark these messages as read.', 403);
+      if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > 200 || body.ids.some(id => typeof id !== 'string' || !id.length || id.length > 80)) fail('Choose up to 200 displayed messages.');
+      // Acknowledge only the displayed IDs belonging to this authenticated member.
+      // A message arriving during this request remains unread until it is displayed.
+      await db.query(`UPDATE ${t.messages} SET member_read_at=now() WHERE user_id=$1 AND sender='mistress' AND member_read_at IS NULL AND id=ANY($2::text[])`, [user.id, body.ids]);
+      return { success: true, unreadMessages: await unreadMessages(db, user.id) };
+    }
     case 'profile': {
       if (body.adultConfirmed !== true) fail('You must confirm that you are 18 or older.');
       const name = text(body.name, 80);

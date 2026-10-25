@@ -68,7 +68,7 @@ export async function openDatabase({ connectionString = process.env.DATABASE_URL
 async function initializeDatabase(db) {
   const t = db.tables;
   const existing = await db.query('SELECT to_regclass($1) AS relation', [`${db.schema}.schema_migrations`]);
-  if (existing.rows[0].relation && (await db.query(`SELECT version FROM ${t.schema_migrations} WHERE version=5`)).rowCount) return;
+  if (existing.rows[0].relation && (await db.query(`SELECT version FROM ${t.schema_migrations} WHERE version=6`)).rowCount) return;
   await db.transaction(async client => {
     // Serializes first-start initialization across multiple app instances.
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`goth-empire-schema:${db.schema}`]);
@@ -119,5 +119,8 @@ async function initializeDatabase(db) {
       ADD COLUMN IF NOT EXISTS email_attempted_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS email_first_attempt_at TIMESTAMPTZ`);
     await client.query(`INSERT INTO ${t.schema_migrations}(version) VALUES (5) ON CONFLICT DO NOTHING`);
+    await client.query(`ALTER TABLE ${t.messages} ADD COLUMN IF NOT EXISTS member_read_at TIMESTAMPTZ`);
+    await client.query(`CREATE INDEX IF NOT EXISTS messages_member_unread ON ${t.messages}(user_id) WHERE sender='mistress' AND member_read_at IS NULL`);
+    await client.query(`INSERT INTO ${t.schema_migrations}(version) VALUES (6) ON CONFLICT DO NOTHING`);
   });
 }

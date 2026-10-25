@@ -31,6 +31,7 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
     }
     assert.equal((await post({ name: 'young', email: 'no@example.test', password: 'portal-test-password-123' }, null, '/api/register')).status, 400);
     assert.equal((await get('/api/portal')).status, 401);
+    assert.equal((await get('/api/portal/notifications')).status, 401);
     const mistress = await register('mistress'); const member = await register('member'); const stranger = await register('stranger');
     await fixture.db.query(`UPDATE ${t.users} SET role='admin' WHERE id=$1`, [mistress.id]);
     assert.equal((await get('/admin.html', member.cookie)).status, 403);
@@ -85,6 +86,25 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
     assert.equal((await post({ action: 'message', message: 'Over quota' }, member.cookie)).status, 403);
     other = await (await get('/api/portal', stranger.cookie)).json(); assert.equal(other.messages.length, 0);
     await success({ action: 'message', userId: member.id, message: 'Reply from Mistress' }, mistress.cookie);
+    assert.equal((await (await get('/api/portal/notifications', member.cookie)).json()).unreadMessages, 1);
+    assert.equal((await (await get('/api/portal/notifications', stranger.cookie)).json()).unreadMessages, 0);
+    const conversation = await (await get('/api/portal/messages', member.cookie)).json();
+    const replyId = conversation.messages.find(message => message.sender === 'mistress').id;
+    assert.equal(conversation.unreadMessages, 1);
+    assert.equal((await fixture.db.query(`SELECT member_read_at FROM ${t.messages} WHERE id=$1`, [replyId])).rows[0].member_read_at, null);
+    await success({ action: 'messages-read', ids: [replyId], userId: member.id }, stranger.cookie);
+    assert.equal((await (await get('/api/portal/notifications', member.cookie)).json()).unreadMessages, 1, 'another member cannot acknowledge this conversation');
+    assert.equal((await post({ action: 'messages-read', ids: [replyId] }, mistress.cookie)).status, 403);
+    assert.equal((await post({ action: 'messages-read', ids: [] }, member.cookie)).status, 400);
+    assert.equal((await post({ action: 'messages-read', ids: Array(201).fill(replyId) }, member.cookie)).status, 400);
+    await success({ action: 'message', userId: member.id, message: 'Arrived after the conversation snapshot' }, mistress.cookie);
+    assert.equal((await success({ action: 'messages-read', ids: [replyId], userId: stranger.id }, member.cookie)).unreadMessages, 1, 'only the displayed message is acknowledged');
+    assert.ok((await fixture.db.query(`SELECT member_read_at FROM ${t.messages} WHERE id=$1`, [replyId])).rows[0].member_read_at);
+    assert.equal((await success({ action: 'messages-read', ids: [replyId] }, member.cookie)).unreadMessages, 1, 'acknowledgment is idempotent');
+    const remaining = await (await get('/api/portal/messages', member.cookie)).json();
+    await success({ action: 'messages-read', ids: remaining.messages.filter(message => message.sender === 'mistress' && !message.member_read_at).map(message => message.id) }, member.cookie);
+    assert.equal((await (await get('/api/portal/notifications', member.cookie)).json()).unreadMessages, 0);
+    assert.equal((await fixture.db.query(`SELECT count(*)::int AS count FROM ${t.messages} WHERE sender='member' AND member_read_at IS NOT NULL`)).rows[0].count, 0, 'outgoing messages are never acknowledged as incoming');
     await success({ action: 'content', title: 'Private library', minRank: 1, text: '<img src=x onerror=alert(1)>', file: { name: 'private.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 test').toString('base64') } }, mistress.cookie);
     portal = await (await get('/api/portal', member.cookie)).json(); const contentId = portal.content[0].id;
     assert.equal((await get(`/api/portal/content-file?id=${contentId}`, member.cookie)).status, 200);
@@ -103,6 +123,8 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
     }
     await fixture.db.query(`UPDATE ${t.users} SET membership_until=now()-interval '1 day' WHERE id=$1`, [member.id]);
     assert.equal((await get('/api/portal', member.cookie)).status, 402);
+    assert.equal((await get('/api/portal/notifications', member.cookie)).status, 402);
+    assert.equal((await post({ action: 'messages-read', ids: [replyId] }, member.cookie)).status, 402);
     assert.equal((await get('/dashboard.html', member.cookie)).status, 302);
     assert.equal((await get(`/api/portal/content-file?id=${contentId}`, member.cookie)).status, 402);
     await success({ action: 'member', userId: member.id, tier: 'observer', suspended: true }, mistress.cookie);
