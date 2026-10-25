@@ -16,8 +16,11 @@ export async function openDatabase({ connectionString = process.env.DATABASE_URL
   // Configure verified TLS explicitly; URL SSL options otherwise override pg's ssl settings.
   for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'channel_binding']) url.searchParams.delete(key);
   const prefix = quoteSchema(schema);
+  // Workers verifies TLS itself but does not expose the peer certificate needed
+  // by SCRAM-SHA-256-PLUS. Use SCRAM-SHA-256 over verified TLS on that runtime.
+  const enableChannelBinding = globalThis.navigator?.userAgent !== 'Cloudflare-Workers';
   const pool = new pg.Pool({
-    connectionString: url.toString(), ssl: { rejectUnauthorized: true }, enableChannelBinding: true,
+    connectionString: url.toString(), ssl: { rejectUnauthorized: true }, enableChannelBinding,
     max: 5, connectionTimeoutMillis: 30000, idleTimeoutMillis: 30000,
     statement_timeout: 15000, query_timeout: 20000, application_name: 'goth-empire'
   });

@@ -21,6 +21,8 @@ Wrangler now builds `dist/` from an explicit list of HTML pages and the `css/`, 
 
 The Worker handles `/api/*`, `/admin`, `/admin.html`, `/dashboard` and `/dashboard.html` before serving any asset. It preserves the existing password hashes, secure session cookies, paid-membership gate and administrator checks. Database pools are opened and closed within each request so sockets are never shared across Worker requests. Public pages remain available when account settings are missing; account operations return 503 until configured.
 
+Workers connects to Neon with SCRAM-SHA-256 inside certificate-verified TLS. Its socket API does not expose the peer certificate required by SCRAM-SHA-256-PLUS channel binding. The Node.js hosting option retains channel binding. Existing account password hashes and the portal encryption key are preserved.
+
 In **Workers & Pages → goth-empire → Settings → Variables and Secrets**, configure the deployed Worker's runtime settings:
 
 | Setting | Value |

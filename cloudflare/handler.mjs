@@ -63,7 +63,8 @@ export function createWorker({ connectDatabase = openDatabase } = {}) {
         });
         return await requests.run(handler, () => nodeHandler.fetch(request, env, ctx));
       } catch (error) {
-        console.error(JSON.stringify({ event: 'account_service_unavailable', code: error.code || 'configuration_or_connection' }));
+        const connectionCode = /^Database initialization failed \(([^)]+)\)/.exec(error.message)?.[1];
+        console.error(JSON.stringify({ event: 'account_service_unavailable', code: error.code || connectionCode || error.name || 'configuration_or_connection' }));
         return unavailable();
       } finally {
         if (db) await db.close();
