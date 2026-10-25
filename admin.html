@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mistress Portal | Goth Empire</title>
+<link rel="icon" type="image/png" href="images/goth-empire-logo.png"><link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body data-admin="true">
+<aside class="portal-sidebar">
+<a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
+<p class="eyebrow">YOUR PRIVATE SPACE</p>
+<nav aria-label="Mistress navigation"><a href="#overview">Overview</a><a href="#payment-requests">Payment inbox <span id="pending-payment-count" class="badge">0</span></a><a href="#members">Members</a><a href="#schedule">Schedule</a><a href="#sessions">Session Records</a><a href="#messages">Messaging</a><a href="#payments">Payments &amp; Revenue</a><a href="#content">Content</a><a href="#profile">My Profile</a></nav>
+<a href="index.html#policies">Consent &amp; cancellation</a>
+<button id="logout-btn" type="button" class="secondary">Log Out</button>
+</aside>
+<main class="portal-main">
+<header id="overview"><p class="eyebrow">MISTRESS PORTAL</p><h1>Your Empire. Your Command.</h1><p id="account-name"></p><p id="account-email"></p><p id="membership-status">Loading your account…</p></header>
+<p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
+<div class="record payment-alert"><p id="payment-alert" role="status" aria-live="polite">Checking payment requests…</p><a href="#payment-requests" id="review-payment-requests">Review payment inbox &rarr;</a></div>
+<div id="portal-root" aria-busy="true"><section id="payment-requests"></section><section id="members"></section><section id="schedule"></section><section id="sessions"></section><section id="messages"></section><section id="payments"></section><section id="content"></section><section id="profile"></section></div>
+</main>
+<script type="module" src="js/account.js"></script><script type="module" src="js/portal.js"></script>
+</body></html>

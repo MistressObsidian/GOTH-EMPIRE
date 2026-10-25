@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>Login - Goth Empire</title>
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="icon" type="image/png" href="images/goth-empire-logo.png">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+
+<body class="auth-page">
+  <!-- Back to home/index link -->
+  <a href="index.html" class="back-link" aria-label="Back to Home">&#8592;</a>
+  <div class="container">
+  <div class="login-box">
+    <h1>  Welcome to Goth Empire</h1>
+    <h2>
+      Login
+    </h2>
+
+    <form id="login-form" method="post" action="/api/login" autocomplete="on">
+
+      <input
+        type="email"
+        id="email" maxlength="254"
+        name="email"
+        placeholder="Email address"
+        autocomplete="username" aria-label="Email address"
+        required>
+      <input
+        type="password"
+        id="password" maxlength="128"
+        name="password"
+        placeholder="Password"
+        autocomplete="current-password" aria-label="Password"
+        required>
+      <button
+        type="submit"
+        id="login-btn" disabled>Enter the Empire
+      </button>
+
+      <div
+        id="login-spinner"
+        class="spinner"
+      ></div>
+      <div
+        id="login-status" role="status" aria-live="polite"
+      ></div>
+      <noscript><p>Enable JavaScript to securely sign in or create an account.</p></noscript>
+    </form>
+    <div class="register-question">
+      <h3>Are you curious?</h3>
+    </div>
+
+    <a class="register-btn auth-button" href="register.html">Register Now</a>
+  </div>
+  </div>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

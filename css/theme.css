@@ -1,0 +1,27 @@
+/* Shared identity across the public site, authentication, checkout and portals. */
+:root {
+  --empire-gold: #d5b574;
+  --empire-burgundy: #76233c;
+  --empire-hover: #91334f;
+  --empire-background: #0c090b;
+  --empire-border: #38292d;
+  --red: var(--empire-burgundy);
+  --red-bright: var(--empire-gold);
+  --red-dark: #4a1728;
+  --gold: var(--empire-gold);
+  --burgundy: var(--empire-burgundy);
+}
+.auth-page { background: var(--empire-background); }
+.auth-page::before { opacity: .12; animation: none; background-size: min(80vw, 700px); }
+.auth-page .login-box { background: #171015; border: 1px solid var(--empire-border); box-shadow: 0 24px 65px #0006; }
+.auth-page .login-box h1 { animation: none; }
+.auth-page h2, .auth-page .back-link, .auth-page .password-hint a { color: var(--empire-gold); }
+.auth-page input { background: #0c090c; border-color: #514047; }
+.auth-page input:focus { border-color: var(--empire-gold); box-shadow: 0 0 0 2px #d5b57433; }
+.auth-page button:not(.password-toggle), .auth-page .auth-button { background: var(--empire-burgundy); }
+.auth-page button:not(.password-toggle):hover:not(:disabled), .auth-page .auth-button:hover { background: var(--empire-hover); }
+.auth-page button:disabled { opacity: .55; }
+.auth-page .password-toggle { color: var(--empire-gold); }
+.auth-page .spinner { border-top-color: var(--empire-gold); }
+.checkout-intro h1 em, .section-number, .checkout-note > span { color: var(--empire-gold); }
+.order-card::before { background: linear-gradient(90deg, transparent, var(--empire-gold), transparent); }

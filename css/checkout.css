@@ -1,0 +1,117 @@
+.checkout-page { background: #080809; }
+.checkout-header { padding-inline: max(5vw, 24px); }
+.checkout-back { font-size: 12px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.checkout-back:hover { color: var(--ivory); }
+.checkout-main { width: min(1100px, calc(100% - 64px)); margin: 62px auto 72px; }
+.checkout-intro { margin-bottom: 42px; }
+.checkout-intro h1 { font-size: clamp(38px, 5vw, 58px); letter-spacing: -.025em; font-weight: 500; margin-bottom: 14px; }
+.checkout-intro h1 em { color: #e85567; font-weight: 400; }
+.checkout-intro > p:last-child { color: var(--muted); font-size: 14px; }
+.checkout-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; align-items: start; }
+.checkout-section { margin-bottom: 32px; }
+.section-label { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 24px; }
+.section-number { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #5b2730; border-radius: 50%; font-size: 11px; color: #e85567; flex-shrink: 0; }
+.section-label h2 { font-family: Inter, Arial, sans-serif; font-size: 17px; line-height: 1.5; font-weight: 600; margin: 0 0 4px; }
+.section-label p { color: var(--muted); font-size: 12px; margin: 0; }
+.checkout-plans { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.checkout-plan { display: block; position: relative; cursor: pointer; }
+.checkout-plan input { position: absolute; top: 24px; left: 20px; width: 18px; height: 18px; accent-color: var(--red); margin: 0; cursor: pointer; z-index: 1; }
+.plan-option { padding: 20px 20px 20px 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #111112; border: 1px solid var(--line); border-radius: 10px; transition: border-color .2s, background .2s; }
+.checkout-plan:hover .plan-option { border-color: #79535a; }
+.checkout-plan input:checked + .plan-option { border-color: #c7394d; background: linear-gradient(110deg, #241116, #131012); box-shadow: 0 0 0 1px #c7394d33; }
+.checkout-plan input:focus-visible + .plan-option { outline: 2px solid var(--ivory); outline-offset: 4px; }
+.plan-option-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.plan-option-name { font-size: 15px; font-weight: 600; }
+.plan-option-description { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.plan-option-price { white-space: nowrap; text-align: right; font-size: 22px; font-family: Georgia, serif; }
+.plan-option-price small { display: block; color: var(--muted); font: 10px Inter, Arial, sans-serif; margin-top: 4px; }
+.plan-popular { padding: 3px 7px; border-radius: 4px; color: #ffbac4; background: #5b202b; font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.account-section { border-top: 1px solid var(--line); padding-top: 28px; }
+.account-card { display: flex; align-items: center; gap: 12px; background: #111112; border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.account-icon { display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; color: var(--muted); flex-shrink: 0; }
+.account-copy { flex: 1; min-width: 0; }
+.account-copy p { margin: 0; overflow-wrap: anywhere; }
+#account-label { font-size: 13px; font-weight: 600; }
+#checkout-account { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.account-badge { color: #a0cfb2; background: #183326; border-radius: 4px; font-size: 10px; padding: 4px 7px; white-space: nowrap; }
+.guest-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin-top: 16px; }
+.guest-actions p { color: var(--muted); font-size: 12px; margin: 0; }
+.guest-actions p a { color: var(--ivory); display: block; margin-top: 5px; }
+.checkout-note { display: flex; gap: 12px; color: var(--muted); font-size: 12px; }
+.checkout-note > span { color: #e85567; font-size: 26px; }
+.checkout-note p { margin: 0; line-height: 1.8; }
+.checkout-note strong { color: #d5cfca; font-weight: 500; }
+.order-card { position: sticky; top: 100px; background: #121213; border: 1px solid #423034; border-radius: 14px; padding: 28px; box-shadow: 0 24px 65px #0004; overflow: hidden; }
+.order-card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #d70b28, transparent); }
+.order-top { border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+.order-top .eyebrow { font-size: 9px; letter-spacing: .2em; }
+.order-top h2 { font-size: 26px; margin-bottom: 8px; font-weight: 500; }
+.order-top > p:last-child { color: var(--muted); font-size: 12px; margin: 0; }
+.summary-plan { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 22px; }
+.summary-label { font-size: 9px; letter-spacing: .12em; color: var(--muted); }
+.summary-plan h3 { font-family: Inter, Arial, sans-serif; font-size: 18px; margin: 8px 0 0; }
+.billing-pill { font-size: 10px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; color: #d6d0cb; }
+.plan-benefits { list-style: none; padding: 0; margin: 22px 0; display: grid; gap: 12px; }
+.plan-benefits li { display: flex; align-items: baseline; gap: 9px; color: #bfb9b4; font-size: 12px; }
+.plan-benefits li::before { content: '\2713'; color: #e85567; }
+.order-totals { border-top: 1px solid var(--line); padding-top: 18px; margin-bottom: 24px; }
+.order-totals > div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
+.order-totals dd { margin: 0; color: var(--ivory); }
+.order-totals .total-row { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; color: var(--ivory); font-size: 15px; }
+.total-row small { display: block; color: var(--muted); font-size: 10px; margin-top: 5px; }
+.total-row dd { font-family: Georgia, serif; font-size: 28px; }
+.payment-notice { display: flex; gap: 10px; padding: 14px; background: #1d1813; border: 1px solid #473428; border-radius: 8px; }
+.notice-dot { width: 6px; height: 6px; border-radius: 50%; background: #d2a078; flex-shrink: 0; margin-top: 7px; }
+.payment-notice strong { font-size: 12px; color: #e6c5a9; font-weight: 500; }
+.payment-notice p { font-size: 11px; line-height: 1.6; color: #bfa996; margin: 6px 0 0; }
+.checkout-payment { margin-top: 18px; border-radius: 7px; }
+.checkout-payment:disabled { background: #292326; color: #b9acb0; border-color: #514047; box-shadow: none; cursor: not-allowed; transform: none; }
+.summary-footnote { font-size: 10px; text-align: center; color: var(--muted); margin: 12px 0 0; }
+.empty-summary { color: var(--muted); font-size: 13px; padding-block: 12px; }
+.checkout-footer { border-top: 1px solid var(--line); padding: 24px max(5vw, 24px); display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 11px; }
+.checkout-page a:focus-visible { outline: 2px solid var(--ivory); outline-offset: 5px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.checkout-page [hidden] { display: none !important; }
+.payment-section { border-top: 1px solid var(--line); padding-top: 28px; }
+.payment-methods { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.payment-option { position: relative; cursor: pointer; }
+.payment-option-ask { grid-column: 1 / -1; }
+.payment-option input { position: absolute; top: 18px; right: 16px; width: 16px; height: 16px; accent-color: var(--red); margin: 0; cursor: pointer; }
+.payment-option-card { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #111112; transition: border-color .2s, background .2s; }
+.payment-option:hover .payment-option-card { border-color: #79535a; }
+.payment-option input:checked + .payment-option-card { border-color: #c7394d; background: linear-gradient(110deg, #241116, #131012); }
+.payment-option input:focus-visible + .payment-option-card { outline: 2px solid var(--ivory); outline-offset: 4px; }
+.payment-method-icon { display: grid; place-items: center; width: 34px; height: 26px; color: #e5ded9; }
+.payment-method-icon svg { width: 28px; height: 28px; }
+.paypal-icon { color: #85baff; font: italic 700 27px Georgia, serif; }
+.payment-method-name { font-size: 14px; font-weight: 600; }
+.payment-method-name small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; margin-top: 6px; line-height: 1.5; }
+.payment-method-help { color: var(--muted); font-size: 11px; margin: 14px 0 0; line-height: 1.7; }
+.payment-summary { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 18px; margin: 0 0 22px; color: var(--muted); font-size: 12px; }
+.payment-summary dd { margin: 0; color: var(--ivory); }
+.payment-panel { margin-top: 20px; padding: 22px; border: 1px solid var(--line); border-radius: 10px; background: #111112; }
+.payment-panel h3, .payment-instructions h3 { font: 600 15px/1.5 Inter, Arial, sans-serif; margin-bottom: 10px; }
+.payment-panel-copy { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 8px 0 0; }
+.payment-preference-label { display: block; margin: 16px 0 8px; font-size: 13px; }
+.payment-preference-input { width: 100%; min-width: 0; padding: 12px; border: 1px solid #79535a; border-radius: 6px; background: #1a1a1c; color: var(--ivory); font: inherit; }
+.payment-preference-input:focus-visible { outline: 2px solid var(--ivory); outline-offset: 3px; }
+.payment-email { border-top: 1px solid var(--line); margin-top: 16px; }
+.payment-contact { font-size: 12px; line-height: 1.8; color: var(--muted); overflow-wrap: anywhere; }
+.payment-contact a { color: var(--ivory); text-decoration: underline; }
+.card-fields { border: 0; padding: 0; margin: 22px 0 0; display: grid; gap: 16px; min-width: 0; }
+.card-fields label { display: grid; gap: 7px; color: #c7c2bd; font-size: 12px; min-width: 0; }
+.card-fields input { width: 100%; min-width: 0; padding: 12px; background: #1a1a1c; border: 1px solid #393436; border-radius: 6px; color: var(--ivory); font: 13px Inter, Arial, sans-serif; }
+.card-fields input:disabled { opacity: .7; cursor: not-allowed; }
+.card-fields input::placeholder { color: #b1a7aa; opacity: 1; }
+.card-field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.payment-instructions { border: 1px solid #394d40; background: #142019; border-radius: 10px; padding: 20px; margin-top: 18px; }
+#instructions-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; }
+.checkout-payment { white-space: normal; line-height: 1.6; letter-spacing: .025em; font-size: 12px; }
+.payment-request-status { font-size: 12px; color: #c7c2bd; line-height: 1.7; overflow-wrap: anywhere; }
+.payment-request-status:empty { display: none; }
+.payment-request-status.error { color: #ff98a6; }
+@media (min-width: 741px) and (max-width: 1000px) { .payment-methods { grid-template-columns: 1fr; } .payment-option-card { flex-direction: row; align-items: center; padding-right: 46px; } }
+@media (max-width: 900px) { .checkout-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; } .order-card { padding: 22px; } }
+@media (max-width: 740px) { .checkout-main { width: calc(100% - 40px); margin-top: 36px; } .checkout-intro { margin-bottom: 32px; } .checkout-layout { grid-template-columns: 1fr; gap: 28px; } .order-card { position: static; } .checkout-back { font-size: 11px; } .checkout-header { padding-inline: 20px; } .checkout-header .brand { width: 120px; } .plan-option { padding-right: 16px; } .account-card { flex-wrap: wrap; } .checkout-footer { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { .checkout-page *, .checkout-page *::before { transition: none; scroll-behavior: auto; } }
+@media (max-width: 480px) { .payment-methods { grid-template-columns: 1fr; } .payment-option-card { flex-direction: row; align-items: center; padding-right: 46px; } .payment-panel { padding: 18px; } }

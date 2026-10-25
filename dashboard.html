@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submissive Portal | Goth Empire</title>
+<link rel="icon" type="image/png" href="images/goth-empire-logo.png"><link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="member-dashboard">
+<aside class="portal-sidebar">
+<a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
+<p class="eyebrow">YOUR PRIVATE SPACE</p>
+<nav aria-label="Portal navigation"><a href="#overview">Overview</a><a href="#profile">My Profile</a><a href="#membership">My Membership</a><a href="#book">Book a Session</a><a href="#sessions">Session Records</a><a href="#messages">Private Messages</a><a href="#content">Exclusive Content</a><a href="#payments">Payments</a></nav>
+<a href="index.html#policies">Consent &amp; cancellation</a>
+<button id="logout-btn" type="button" class="secondary">Log Out</button>
+</aside>
+<main class="portal-main">
+<div class="member-topbar">
+<header id="overview">
+  <p class="eyebrow">SUBMISSIVE PORTAL</p><h1>My Private Space</h1>
+  <p>Your membership, appointments and private conversations at a glance.</p>
+  <section class="dashboard-bio" aria-labelledby="dashboard-bio-title">
+    <div class="dashboard-bio-heading"><h2 id="dashboard-bio-title">About me</h2><a href="#profile">Edit profile</a></div>
+    <p class="bio-privacy">Private · Visible only to you and the Mistress</p>
+    <div id="member-bio-copy" aria-live="polite"><p>Loading your profile…</p></div>
+  </section>
+</header>
+<aside class="member-summary" aria-label="Your member profile">
+  <div class="member-avatar" id="member-initials" aria-hidden="true">◇</div>
+  <p class="eyebrow">YOUR PROFILE</p>
+  <h2 id="account-name"></h2><p id="account-email"></p>
+  <p id="membership-status" class="badge">Loading your account…</p>
+  <p id="member-expiry" class="muted"></p>
+  <a class="portal-button secondary" href="#profile">Edit my profile</a>
+</aside>
+</div>
+<div class="member-layout">
+<div class="member-content">
+<p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
+<div id="member-overview" aria-label="Account overview" aria-busy="true"></div>
+<div id="portal-root" aria-busy="true"><section id="profile"></section><section id="membership"></section><section id="book"></section><section id="sessions"></section><section id="messages"></section><section id="content"></section><section id="payments"></section></div>
+</div>
+</div>
+</main>
+<script type="module" src="js/account.js"></script><script type="module" src="js/portal.js"></script>
+</body></html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Choose your Goth Empire membership and review your monthly plan.">
+  <title>Checkout | Goth Empire</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/checkout.css">
+  <link rel="icon" type="image/png" href="images/goth-empire-logo.png">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="checkout-page">
+  <div class="page-glow"></div>
+  <header class="site-header checkout-header">
+    <a class="brand" href="index.html" aria-label="Goth Empire home"><img src="images/goth-empire-logo.png" alt="Goth Empire"></a>
+    <a class="checkout-back" href="index.html#membership"><span aria-hidden="true">&larr;</span> Back to memberships</a>
+  </header>
+  <main class="checkout-main">
+    <div class="checkout-intro">
+      <p class="eyebrow">YOUR PLACE IN THE EMPIRE</p>
+      <h1>Make it <em>personal.</em></h1>
+      <p>Apply for your place in the Mistress's private world. Membership fees do not include private sessions. Sending a payment request does not activate access.</p>
+    </div>
+    <div class="checkout-layout">
+      <div class="checkout-details">
+        <section class="checkout-section" aria-labelledby="plan-heading">
+          <div class="section-label"><span class="section-number" aria-hidden="true">01</span><div><h2 id="plan-heading">Choose your membership</h2><p>Find the level of connection that fits you.</p></div></div>
+          <fieldset class="checkout-plans" id="checkout-plans"><legend class="sr-only">Membership plan</legend></fieldset>
+        </section>
+        <section class="checkout-section account-section" aria-labelledby="account-heading">
+          <div class="section-label"><span class="section-number" aria-hidden="true">02</span><div><h2 id="account-heading">Your account</h2><p>Your membership belongs to you.</p></div></div>
+          <div class="account-card">
+            <span class="account-icon" aria-hidden="true">@</span>
+            <div class="account-copy"><p id="account-label">Member account</p><p id="checkout-account" role="status">Checking your account&hellip;</p></div>
+            <span id="account-badge" class="account-badge" hidden>Signed in</span>
+          </div>
+          <div id="guest-actions" class="guest-actions" hidden><a class="button button-primary" href="login.html">Log In</a><p>New to the Empire? <a href="register.html">Create an account &rarr;</a></p></div>
+        </section>
+        <section class="checkout-section payment-section" aria-labelledby="payment-heading">
+          <div class="section-label"><span class="section-number" aria-hidden="true">03</span><div><h2 id="payment-heading">Arrange payment with Mistress</h2><p>Ask what is available, or tell Mistress which method is easiest for you.</p></div></div>
+          <fieldset class="payment-methods" id="payment-methods" aria-describedby="payment-method-help">
+            <legend class="sr-only">Payment method</legend>
+            <label class="payment-option payment-option-ask">
+              <input type="radio" name="payment-method" value="ask" checked>
+              <span class="payment-option-card"><span class="payment-method-icon" aria-hidden="true">?</span><span class="payment-method-name">Ask Mistress<small>Find out which payment options are currently available</small></span></span>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment-method" value="card">
+              <span class="payment-option-card">
+                <span class="payment-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg></span>
+                <span class="payment-method-name">Debit / Credit Card<small>My preferred method</small></span>
+              </span>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment-method" value="paypal">
+              <span class="payment-option-card">
+                <span class="payment-method-icon paypal-icon" aria-hidden="true">P</span>
+                <span class="payment-method-name">PayPal<small>My preferred method</small></span>
+              </span>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment-method" value="gift-card">
+              <span class="payment-option-card">
+                <span class="payment-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M2 9h20M12 9v12M12 9H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg></span>
+                <span class="payment-method-name">Gift Card<small>Ask which types are accepted</small></span>
+              </span>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment-method" value="other">
+              <span class="payment-option-card"><span class="payment-method-icon" aria-hidden="true">+</span><span class="payment-method-name">Another method<small>Tell Mistress what works for you</small></span></span>
+            </label>
+          </fieldset>
+          <p id="payment-method-help" class="payment-method-help" role="status">Mistress will confirm the best available option before you pay.</p>
+          <section id="ask-panel" class="payment-panel" aria-labelledby="ask-details-heading">
+            <h3 id="ask-details-heading">Let Mistress guide you</h3>
+            <p class="payment-panel-copy">Send a request to ask which payment methods are currently available. Mistress can recommend an option and reply with instructions here or by email.</p>
+          </section>
+          <section id="card-panel" class="payment-panel" aria-labelledby="card-details-heading" hidden>
+            <h3 id="card-details-heading">Prefer to pay by card?</h3>
+            <p class="payment-panel-copy">Tell Mistress your preference. She will confirm whether a secure card payment option is available or suggest an alternative. Do not send card numbers, expiry dates or security codes.</p>
+          </section>
+          <section id="paypal-panel" class="payment-panel" aria-labelledby="paypal-details-heading" hidden>
+            <h3 id="paypal-details-heading">Prefer PayPal?</h3>
+            <p class="payment-panel-copy">Ask Mistress whether PayPal is currently available. Wait for her confirmed instructions before sending money.</p>
+          </section>
+          <section id="gift-card-panel" class="payment-panel" aria-labelledby="gift-card-details-heading" hidden>
+            <h3 id="gift-card-details-heading">Prefer a gift card?</h3>
+            <p class="payment-panel-copy">Request accepted gift card types and redemption instructions before purchasing or using a gift card.</p>
+            <p class="payment-panel-copy">Do not send gift card codes or PINs in this request or by email.</p>
+          </section>
+          <section id="other-panel" class="payment-panel" aria-labelledby="other-details-heading" hidden>
+            <h3 id="other-details-heading">What works best for you?</h3>
+            <label class="payment-preference-label" for="other-payment-method">Preferred payment service or method</label>
+            <input id="other-payment-method" class="payment-preference-input" type="text" minlength="2" maxlength="80" placeholder="e.g. Cash App or bank transfer" autocomplete="off" aria-describedby="other-method-help">
+            <p id="other-method-help" class="payment-panel-copy">Service names only, without numbers, account details or codes. Mistress will confirm availability or suggest another option.</p>
+          </section>
+          <div id="payment-instructions" class="payment-instructions" hidden>
+            <h3 id="instructions-heading">Mistress's reply</h3>
+            <p id="instructions-text"></p>
+            <p class="payment-panel-copy">Instructions only. Payment and membership activation have not been confirmed.</p>
+          </div>
+        </section>
+        <div class="checkout-note"><span aria-hidden="true">&#9671;</span><p><strong>A membership on your terms.</strong><br>Monthly access, with the freedom to cancel anytime.</p></div>
+      </div>
+      <aside class="order-card" aria-labelledby="summary-heading">
+        <div class="order-top"><p class="eyebrow">MEMBERSHIP CHECKOUT</p><h2 id="summary-heading">Your next chapter.</h2><p>All the details, in one place.</p></div>
+        <div id="empty-summary" class="empty-summary"><p>Select a membership to see your plan details and monthly total.</p></div>
+        <div id="order-summary" hidden aria-live="polite">
+          <div class="summary-plan"><div><span class="summary-label">YOUR MEMBERSHIP</span><h3 id="plan-name"></h3></div><span class="billing-pill">Monthly</span></div>
+          <ul id="plan-benefits" class="plan-benefits"></ul>
+          <dl class="order-totals"><div><dt>Monthly membership</dt><dd id="plan-price"></dd></div><div class="total-row"><dt>Monthly total <small>USD &middot; billed monthly</small></dt><dd id="plan-total"></dd></div></dl>
+        </div>
+        <dl class="payment-summary"><dt>Payment preference</dt><dd id="payment-method-summary">Ask Mistress</dd></dl>
+        <div class="payment-notice"><span class="notice-dot" aria-hidden="true"></span><div><strong id="payment-notice-title">Confirm your options first</strong><p id="payment-notice-detail">Mistress will confirm an available method and instructions. This request does not charge you.</p></div></div>
+        <button class="button button-primary full checkout-payment" id="checkout-payment" type="button" aria-describedby="payment-request-status payment-email-status" disabled>Send request &amp; email Mistress</button>
+        <p id="payment-request-status" class="payment-request-status" role="status" aria-live="polite"></p>
+        <p id="payment-email-status" class="payment-request-status" role="status" aria-live="polite" hidden></p>
+        <button id="retry-payment-email" class="button full checkout-payment" type="button" hidden>Retry sending email</button>
+        <div class="payment-email" id="payment-email" hidden>
+          <a id="email-mistress" class="button full checkout-payment" href="mailto:ivyfoxasmr@outlook.com">Use my email app instead</a>
+          <p class="payment-panel-copy">This fallback opens a prepared email. Press Send in your email app to deliver it.</p>
+        </div>
+        <p class="payment-contact">Mistress's email: <a href="mailto:ivyfoxasmr@outlook.com">ivyfoxasmr@outlook.com</a><br>Replies appear here when saved in the portal. You can also contact Mistress directly by email.</p>
+        <p class="summary-footnote">Selecting a plan does not start a subscription.</p>
+      </aside>
+    </div>
+  </main>
+  <footer class="checkout-footer"><span>&copy; 2026 Goth Empire</span><a href="index.html#contact">Questions? Get in touch &rarr;</a></footer>
+  <script type="module" src="js/checkout.js"></script>
+</body>
+</html>
