@@ -1,6 +1,6 @@
 export function initDashboardBackground(window = globalThis.window) {
   const document = window.document;
-  const video = document.querySelector('#dashboard-background');
+  const video = document.querySelector('[data-background-video]');
   const toggle = document.querySelector('#background-video-toggle');
   if (!video || !toggle) return;
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');

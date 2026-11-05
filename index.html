@@ -7,9 +7,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css"><link rel="icon" type="image/png" href="images/goth-empire-logo.png">
+  <link rel="stylesheet" href="css/background-video.css">
   <link rel="stylesheet" href="css/theme.css">
 </head>
-<body class="home-page">
+<body class="home-page has-background-video">
+<div class="video-backdrop" aria-hidden="true">
+<video id="home-background" data-background-video muted autoplay loop playsinline preload="none" poster="images/dashboard-background.jpg" tabindex="-1" disablepictureinpicture disableremoteplayback>
+<source data-src="videos/dashboard-background.mp4" type="video/mp4">
+</video>
+</div>
+<button id="background-video-toggle" type="button" class="background-video-toggle home-video-toggle" hidden>Play background video</button>
 <div class="page-glow"></div>
 <header class="site-header">
   <a class="brand" href="#home" aria-label="Goth Empire home"><img src="images/goth-empire-logo.png" alt="Goth Empire"></a>
@@ -82,4 +89,5 @@
 </main>
 <footer class="site-footer"><div class="footer-brand"><img src="images/goth-empire-logo.png" alt="Goth Empire"><div><strong>GOTH EMPIRE · GODDESS IVY</strong><p>© 2026 Goth Empire. All rights reserved.</p></div></div><nav class="footer-nav"><a href="#about">The Mistress</a><a href="#membership">Membership</a><a href="#policies">Privacy &amp; Consent</a><a href="login.html">Member Login</a><a href="admin.html">Mistress Portal</a></nav><div class="social">ADULTS 18+</div></footer>
 <script type="module" src="js/app.js"></script>
+<script type="module" src="js/dashboard-background.js"></script>
 </body></html>

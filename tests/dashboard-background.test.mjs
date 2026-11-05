@@ -5,9 +5,10 @@ import { JSDOM } from 'jsdom';
 import { initDashboardBackground } from '../js/dashboard-background.js';
 
 const html = await readFile(new URL('../dashboard.html', import.meta.url), 'utf8');
+const home = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function setup({ reduced = false, saveData = false, blocked = false, rememberedPause = false } = {}) {
-  const dom = new JSDOM(html, { url: 'https://goth.example.test/dashboard.html', pretendToBeVisual: true });
+function setup({ reduced = false, saveData = false, blocked = false, rememberedPause = false, page = 'dashboard' } = {}) {
+  const dom = new JSDOM(page === 'home' ? home : html, { url: `https://goth.example.test/${page === 'home' ? 'index.html#membership' : 'dashboard.html'}`, pretendToBeVisual: true });
   const { window } = dom;
   const video = window.document.querySelector('video');
   const toggle = window.document.querySelector('#background-video-toggle');
@@ -48,6 +49,22 @@ test('dashboard video stays muted, respects pause across navigation, and stops i
     f.setHidden(true); f.setHidden(false); await flush();
     assert.equal(f.video.paused, true, 'Returning to the tab must not undo the member’s Pause choice');
     assert.equal(f.window.sessionStorage.getItem('goth-empire.background-video-paused'), 'true');
+  } finally { f.close(); }
+});
+
+test('the homepage loads the same background at membership links and keeps its pause control available', async () => {
+  const f = setup({ page: 'home' });
+  try {
+    await flush();
+    assert.equal(f.video.paused, false);
+    assert.equal(f.video.muted, true);
+    assert.equal(f.video.loop, true);
+    assert.equal(f.video.playsInline, true);
+    assert.ok(f.video.querySelector('source').src.endsWith('/videos/dashboard-background.mp4'));
+    assert.equal(f.window.location.hash, '#membership');
+    assert.equal(f.toggle.hidden, false);
+    f.toggle.click(); assert.equal(f.video.paused, true);
+    f.toggle.click(); await flush(); assert.equal(f.video.paused, false);
   } finally { f.close(); }
 });
 
