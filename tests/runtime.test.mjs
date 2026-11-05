@@ -2,6 +2,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readRuntimeConfig } from '../runtime.mjs';
 import { createApp } from '../server.mjs';
+import { readFile } from 'node:fs/promises';
+
+test('Node hosting serves the background video with its media type and bounded byte ranges', async () => {
+  const database = { tables: {}, query: async () => ({ rows: [], rowCount: 0 }), close: async () => {} };
+  const app = await createApp(undefined, { database, config: readRuntimeConfig({}) });
+  await new Promise(resolve => app.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${app.address().port}/videos/dashboard-background.mp4`;
+  const video = await readFile(new URL('../videos/dashboard-background.mp4', import.meta.url));
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    assert.equal(head.status, 200); assert.equal(head.headers.get('content-type'), 'video/mp4');
+    assert.equal(Number(head.headers.get('content-length')), video.length);
+    for (const [range, start, end] of [['bytes=0-1023', 0, 1024], ['bytes=-100', video.length - 100, video.length], [`bytes=${video.length - 100}-`, video.length - 100, video.length]]) {
+      const response = await fetch(url, { headers: { Range: range } });
+      assert.equal(response.status, 206);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), video.subarray(start, end));
+    }
+    assert.equal((await fetch(url, { headers: { Range: `bytes=${video.length}-` } })).status, 416);
+    assert.equal((await fetch(url, { headers: { Range: 'bytes=-0' } })).status, 416);
+  } finally { await app.shutdown(); }
+});
 
 test('production requires an HTTPS origin, secure cookies, and binds to the hosting network', () => {
   assert.throws(() => readRuntimeConfig({ NODE_ENV: 'production' }), /APP_ORIGIN/);

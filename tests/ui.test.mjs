@@ -29,8 +29,8 @@ test('every page, internal link, image, stylesheet, script, and stylesheet image
       const ids = [...document.querySelectorAll('[id]')].map(node => node.id);
       assert.equal(new Set(ids).size, ids.length, `Duplicate IDs on ${name}`);
       assert.ok(document.querySelector('link[rel="icon"]'), `Missing icon on ${name}`);
-      for (const node of document.querySelectorAll('a[href],link[href],script[src],img[src]')) {
-        const value = node.getAttribute('href') || node.getAttribute('src');
+      for (const node of document.querySelectorAll('a[href],link[href],script[src],img[src],video[poster],source[data-src]')) {
+        const value = node.getAttribute('href') || node.getAttribute('src') || node.getAttribute('poster') || node.getAttribute('data-src');
         const url = new URL(value, dom.window.location.href);
         if (url.origin !== dom.window.location.origin) continue;
         assert.notEqual(value, '#', `Placeholder link on ${name}`);

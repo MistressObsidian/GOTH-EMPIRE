@@ -12,6 +12,14 @@ import { safeMember, portalGet, portalPost, seal } from './portal.mjs';
 import { plans } from './js/membership.js';
 
 const derive = promisify(scrypt);
+export function parseMediaRange(header, length) {
+  const range = /^bytes=(\d*)-(\d*)$/.exec(header || '');
+  if (!range || (!range[1] && !range[2])) return;
+  const start = range[1] ? Number(range[1]) : Math.max(0, length - Number(range[2]));
+  const end = range[1] && range[2] ? Math.min(Number(range[2]), length - 1) : length - 1;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start >= length || end < start) return null;
+  return { start, end };
+}
 export function createRequestHandler(db, { config = readRuntimeConfig(), paymentEmailSender = createPaymentEmailSender(), attempts = new Map(), readPublicFile = path => readFile(join(dirname(fileURLToPath(import.meta.url)), path.slice(1))) } = {}) {
   const t = db.tables;
   const digest = token => createHash('sha256').update(token).digest('hex');
@@ -139,11 +147,25 @@ export function createRequestHandler(db, { config = readRuntimeConfig(), payment
       if (path === '/dashboard.html' && user.role !== 'admin' && safeMember(user).tier === 'observer') {
         res.writeHead(302, { Location: '/checkout.html' + (user.selected_plan ? '?plan=' + encodeURIComponent(user.selected_plan) : '') }); return res.end();
       }
-      if (!/^\/(index|login|register|dashboard|checkout|admin)\.html$/.test(path) && !/^\/(css|js|images)\/[a-zA-Z0-9_./-]+$/.test(path)) return send(404, { error: 'Not found.' });
+      if (!/^\/(index|login|register|dashboard|checkout|admin)\.html$/.test(path) && !/^\/(css|js|images|videos)\/[a-zA-Z0-9_./-]+$/.test(path)) return send(404, { error: 'Not found.' });
       if (path.split('/').some(segment => segment.startsWith('.'))) return send(404, { error: 'Not found.' });
       const content = await readPublicFile(path);
       const ext = path.split('.').pop();
-      const types = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };
+      const types = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', mp4: 'video/mp4' };
+      if (ext === 'mp4') {
+        res.setHeader('Accept-Ranges', 'bytes');
+        const range = req.headers['if-range'] ? undefined : parseMediaRange(req.headers.range, content.length);
+        if (range !== undefined) {
+          if (range === null) {
+            res.writeHead(416, { 'Content-Range': `bytes */${content.length}` });
+            return res.end();
+          }
+          const { start, end } = range;
+          res.writeHead(206, { 'Content-Type': types.mp4, 'Content-Range': `bytes ${start}-${end}/${content.length}`, 'Content-Length': end - start + 1, 'Cache-Control': 'no-store' });
+          return res.end(req.method === 'HEAD' ? undefined : content.subarray(start, end + 1));
+        }
+        res.setHeader('Content-Length', content.length);
+      }
       res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' });
       res.end(req.method === 'HEAD' ? undefined : content);
     } catch (error) {

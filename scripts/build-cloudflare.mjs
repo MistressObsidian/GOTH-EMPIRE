@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,9 +11,11 @@ export async function buildCloudflareAssets() {
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   for (const page of pages) await cp(join(root, `${page}.html`), join(output, `${page}.html`));
-  for (const directory of ['css', 'js', 'images']) {
+  for (const directory of ['css', 'js', 'images', 'videos']) {
     await cp(join(root, directory), join(output, directory), { recursive: true, dereference: false });
   }
+  // The Assets binding can omit Content-Length; keep range metadata tied to this build.
+  await writeFile(join(output, 'videos', 'metadata.json'), JSON.stringify({ bytes: (await stat(join(output, 'videos', 'dashboard-background.mp4'))).size }));
   let count = 0;
   async function verify(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

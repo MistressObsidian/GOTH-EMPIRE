@@ -17,7 +17,9 @@ Use these settings in the connected Cloudflare build:
 | Deploy command | `npm run deploy` (the existing `npx wrangler deploy` also reads this configuration) |
 | Dependency installation | `npm ci`, including development dependencies |
 
-Wrangler now builds `dist/` from an explicit list of HTML pages and the `css/`, `js/` and `images/` folders. It uploads that directory instead of the repository root. `node_modules/workerd`, `.env`, server modules, tests, documentation and recovery data are excluded. The build checks that every public file fits Cloudflare's 25 MiB asset limit. `dist/` is generated and should not be committed.
+Wrangler now builds `dist/` from an explicit list of HTML pages and the `css/`, `js/`, `images/` and `videos/` folders. It uploads that directory instead of the repository root. `node_modules/workerd`, `.env`, server modules, tests, documentation and recovery data are excluded. The build checks that every public file fits Cloudflare's 25 MiB asset limit. `dist/` is generated and should not be committed.
+
+The member dashboard uses `videos/dashboard-background.mp4` with `images/dashboard-background.jpg` as its still fallback. Playback is muted, loops inline on mobile, and pauses when the page is hidden. Reduced-motion and data-saving preferences use the still image until the member explicitly selects Play background video. The pause preference is remembered for the current tab. Replace these two media files to change the dashboard background; keep the MP4 below the asset limit. These are site assets, so the video contains no private member records.
 
 The Worker handles `/api/*`, `/admin`, `/admin.html`, `/dashboard` and `/dashboard.html` before serving any asset. It preserves the existing password hashes, secure session cookies, paid-membership gate and administrator checks. Database pools are opened and closed within each request so sockets are never shared across Worker requests. Public pages remain available when account settings are missing; account operations return 503 until configured.
 

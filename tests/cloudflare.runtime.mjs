@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { unstable_dev } from 'wrangler';
 import { buildCloudflareAssets } from '../scripts/build-cloudflare.mjs';
@@ -16,7 +16,7 @@ test('Cloudflare packaging and request handling in the Workers runtime', { timeo
   const cookie = { Cookie: `session=${'a'.repeat(64)}` };
   try {
     await t.test('only public files are packaged and fit the asset limit', async () => {
-      assert.deepEqual((await readdir('dist')).sort(), ['admin.html', 'checkout.html', 'css', 'dashboard.html', 'images', 'index.html', 'js', 'login.html', 'register.html']);
+      assert.deepEqual((await readdir('dist')).sort(), ['admin.html', 'checkout.html', 'css', 'dashboard.html', 'images', 'index.html', 'js', 'login.html', 'register.html', 'videos']);
       async function verify(directory) {
         for (const entry of await readdir(directory, { withFileTypes: true })) {
           const path = join(directory, entry.name);
@@ -44,6 +44,20 @@ test('Cloudflare packaging and request handling in the Workers runtime', { timeo
       assert.equal((await get('/admin.html?fixture=admin', { headers: cookie })).status, 200);
       assert.equal((await get('/dashboard.html', { headers: cookie })).status, 200);
       assert.equal((await get('/dashboard.html?fixture=pending', { headers: cookie })).headers.get('location'), '/checkout.html?plan=supporter');
+    });
+    await t.test('background video is served as MP4 and supports partial playback requests', async () => {
+      const video = await readFile('videos/dashboard-background.mp4');
+      for (const [range, start, end] of [['bytes=0-1023', 0, 1024], ['bytes=-100', video.length - 100, video.length], ['bytes=1000000-', 1000000, video.length]]) {
+        const response = await get('/videos/dashboard-background.mp4', { headers: { Range: range } });
+        assert.equal(response.status, 206);
+        assert.match(response.headers.get('content-type'), /^video\/mp4/);
+        assert.equal(response.headers.get('content-range'), `bytes ${start}-${end - 1}/${video.length}`);
+        assert.deepEqual(Buffer.from(await response.arrayBuffer()), video.subarray(start, end));
+      }
+      assert.equal((await get('/videos/dashboard-background.mp4', { headers: { Range: `bytes=${video.length}-` } })).status, 416);
+      const head = await get('/videos/dashboard-background.mp4', { method: 'HEAD' });
+      assert.equal(Number(head.headers.get('content-length')), video.length);
+      assert.equal((await get('/videos/dashboard-background.mp4', { headers: { Range: 'bytes=0-1', 'If-Range': '"outdated"' } })).status, 200);
     });
     await t.test('backend files and unexpected asset paths are unavailable', async () => {
       for (const path of ['/.env', '/.env.example', '/server.mjs', '/database.mjs', '/package.json', '/node_modules/workerd/bin/workerd', '/data/accounts.sqlite', '/DEPLOYMENT.md', '/cloudflare/worker.mjs', '/admin.html/', '/css/%2eenv', '/admin%252ehtml']) {

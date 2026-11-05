@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="css/theme.css">
 </head>
 <body class="member-dashboard">
+<div class="dashboard-backdrop" aria-hidden="true">
+<video id="dashboard-background" muted autoplay loop playsinline preload="none" poster="images/dashboard-background.jpg" tabindex="-1" disablepictureinpicture disableremoteplayback>
+<source data-src="videos/dashboard-background.mp4" type="video/mp4">
+</video>
+</div>
 <header class="member-appbar">
 <a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
 <div class="member-appbar-actions">
@@ -21,7 +26,10 @@
 <button id="logout-btn" type="button" class="secondary">Log Out</button>
 </aside>
 <main class="portal-main" id="member-main">
+<div class="member-view-tools">
 <p class="eyebrow member-breadcrumb">YOUR PRIVATE SPACE</p>
+<button id="background-video-toggle" type="button" class="secondary background-video-toggle" hidden>Play background video</button>
+</div>
 <h1 id="member-view-title" tabindex="-1">Overview</h1>
 <p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
 <p id="message-notification-status" class="notification-status" role="status" aria-live="polite"></p>
@@ -54,5 +62,5 @@
 </div>
 </div>
 </main>
-<script type="module" src="js/account.js"></script><script type="module" src="js/portal.js"></script>
+<script type="module" src="js/account.js"></script><script type="module" src="js/portal.js"></script><script type="module" src="js/dashboard-background.js"></script>
 </body></html>
