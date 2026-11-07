@@ -2,23 +2,65 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mistress Portal | Goth Empire</title>
-<link rel="icon" type="image/png" href="images/goth-empire-logo.png"><link rel="stylesheet" href="css/portal.css">
-  <link rel="stylesheet" href="css/theme.css">
+<title>Overview | Mistress Portal | Goth Empire</title>
+<link rel="icon" type="image/png" href="images/goth-empire-logo.png">
+<link rel="stylesheet" href="css/portal.css">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/admin.css">
 </head>
-<body data-admin="true">
-<aside class="portal-sidebar">
-<a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
-<p class="eyebrow">YOUR PRIVATE SPACE</p>
-<nav aria-label="Mistress navigation"><a href="#overview">Overview</a><a href="#payment-requests">Payment inbox <span id="pending-payment-count" class="badge">0</span></a><a href="#members">Members</a><a href="#schedule">Schedule</a><a href="#sessions">Session Records</a><a href="#messages">Messaging</a><a href="#payments">Payments &amp; Revenue</a><a href="#content">Content</a><a href="#profile">My Profile</a></nav>
-<a href="index.html#policies">Consent &amp; cancellation</a>
-<button id="logout-btn" type="button" class="secondary">Log Out</button>
+<body class="admin-dashboard" data-admin="true">
+<a class="admin-skip-link" href="#admin-view-title">Skip to workspace</a>
+<button id="admin-menu-backdrop" class="admin-menu-backdrop" type="button" aria-label="Close navigation" tabindex="-1" hidden></button>
+<aside id="admin-menu" class="portal-sidebar admin-sidebar" aria-label="Administration navigation">
+  <div class="admin-sidebar-heading">
+    <a class="portal-brand" href="index.html"><img src="images/goth-empire-logo.png" alt="Goth Empire"><span>GOTH EMPIRE<small>GODDESS IVY</small></span></a>
+    <button id="admin-menu-close" class="admin-menu-close secondary" type="button" aria-label="Close navigation">&times;</button>
+  </div>
+  <p id="admin-navigation-label" class="eyebrow">MISTRESS PORTAL</p>
+  <nav aria-label="Mistress navigation">
+    <a href="#overview"><span>Overview</span></a>
+    <p class="admin-nav-group">People &amp; communication</p>
+    <a href="#members"><span>Members</span></a>
+    <a href="#messages"><span>Private messages</span></a>
+    <p class="admin-nav-group">Appointments</p>
+    <a href="#schedule"><span>Availability</span></a>
+    <a href="#sessions"><span>Session records</span></a>
+    <p class="admin-nav-group">Payments</p>
+    <a href="#payment-requests"><span>Payment inbox</span><span id="pending-payment-count" class="badge" aria-label="Payment requests awaiting a reply">0</span></a>
+    <a href="#payments"><span>Payment records</span></a>
+    <p class="admin-nav-group">Workspace</p>
+    <a href="#content"><span>Exclusive content</span></a>
+    <a href="#profile"><span>My profile</span></a>
+  </nav>
+  <div class="admin-sidebar-footer">
+    <a href="index.html#policies">Consent &amp; cancellation policy</a>
+    <button id="logout-btn" type="button" class="secondary">Log out</button>
+  </div>
 </aside>
-<main class="portal-main">
-<header id="overview"><p class="eyebrow">MISTRESS PORTAL</p><h1>Your Empire. Your Command.</h1><p id="account-name"></p><p id="account-email"></p><p id="membership-status">Loading your account…</p></header>
-<p id="account-status" role="status" aria-live="polite"></p><p id="portal-status" role="status" aria-live="polite"></p>
-<div class="record payment-alert"><p id="payment-alert" role="status" aria-live="polite">Checking payment requests…</p><a href="#payment-requests" id="review-payment-requests">Review payment inbox &rarr;</a></div>
-<div id="portal-root" aria-busy="true"><section id="payment-requests"></section><section id="members"></section><section id="schedule"></section><section id="sessions"></section><section id="messages"></section><section id="payments"></section><section id="content"></section><section id="profile"></section></div>
+<div class="admin-appbar">
+  <div class="admin-appbar-start">
+    <button id="admin-menu-toggle" class="admin-menu-toggle secondary" type="button" aria-expanded="false" aria-controls="admin-menu"><span aria-hidden="true" class="admin-menu-icon"></span>Menu</button>
+    <span class="admin-appbar-label">Private administration</span>
+  </div>
+  <a href="index.html" class="admin-site-link">View website <span aria-hidden="true">↗</span></a>
+</div>
+<main id="admin-main" class="portal-main admin-main">
+  <header class="admin-account-header">
+    <div class="admin-account-intro"><p class="eyebrow">GODDESS IVY · GOTH EMPIRE</p><h1>Your administration workspace</h1><p>Manage your members, conversations and appointments in one place.</p></div>
+    <div class="admin-account-identity"><p id="account-name"></p><p id="account-email"></p><p id="membership-status">Loading your account…</p></div>
+  </header>
+  <p id="account-status" role="status" aria-live="polite"></p>
+  <p id="portal-status" role="status" aria-live="polite"></p>
+  <div class="admin-workspace-heading"><p class="admin-breadcrumb">Mistress portal <span aria-hidden="true">/</span></p><h2 id="admin-view-title" tabindex="-1">Overview</h2><p id="admin-view-description">A clear view of your members and work awaiting your attention.</p></div>
+  <section id="overview" class="admin-overview" data-admin-view="overview" aria-labelledby="admin-view-title">
+    <div class="record payment-alert"><div><p class="admin-card-label">PAYMENT INBOX</p><p id="payment-alert" role="status" aria-live="polite">Checking payment requests…</p></div><a href="#payment-requests" id="review-payment-requests" class="portal-button secondary">Review payment inbox <span aria-hidden="true">→</span></a></div>
+    <div id="admin-overview-summary" class="admin-summary-grid" aria-busy="true"></div>
+    <div class="admin-overview-shortcuts"><div><h3>Workspace shortcuts</h3><p class="muted">Choose the area you want to work on.</p></div><div class="admin-shortcut-grid"><a href="#members"><strong>Members</strong><span>Review profiles and manage access <span aria-hidden="true">→</span></span></a><a href="#messages"><strong>Private messages</strong><span>Read conversations and reply <span aria-hidden="true">→</span></span></a><a href="#schedule"><strong>Availability</strong><span>Publish and manage appointment windows <span aria-hidden="true">→</span></span></a><a href="#sessions"><strong>Session records</strong><span>Review requests and confirmed appointments <span aria-hidden="true">→</span></span></a></div></div>
+  </section>
+  <div id="portal-root" aria-busy="true"><section id="payment-requests" hidden></section><section id="members" hidden></section><section id="schedule" hidden></section><section id="sessions" hidden></section><section id="messages" hidden></section><section id="payments" hidden></section><section id="content" hidden></section><section id="profile" hidden></section></div>
+  <noscript><p class="record">Enable JavaScript to use the private administration workspace.</p></noscript>
 </main>
-<script type="module" src="js/account.js"></script><script type="module" src="js/portal.js"></script>
-</body></html>
+<script type="module" src="js/account.js"></script>
+<script type="module" src="js/portal.js"></script>
+</body>
+</html>

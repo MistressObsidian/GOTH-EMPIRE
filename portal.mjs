@@ -95,7 +95,7 @@ export async function portalPost(db, user, body) {
   const t = db.tables;
   const admin = user.role === 'admin';
   const tier = memberTier(user);
-  if (!admin && tier.rank < 1 && !['message', 'messages-read', 'select-plan'].includes(body.action)) fail('Activate a membership to unlock this feature. Private chat is available without payment.', 402);
+  if (!admin && tier.rank < 1 && !['message', 'messages-read', 'select-plan', 'cancel', 'withdraw-consent'].includes(body.action)) fail('Activate a membership to unlock this feature. Private chat is available without payment.', 402);
   const requireAdmin = () => { if (!admin) fail('Mistress access required.', 403); };
   const requireAdult = () => { if (!user.adult_confirmed) fail('Confirm adult eligibility in My Profile first.', 403); };
   switch (body.action) {
@@ -138,6 +138,13 @@ export async function portalPost(db, user, body) {
       break;
     }
     case 'cancel': {
+      const row = (await db.query(`SELECT * FROM ${t.bookings} WHERE id=$1 AND user_id=$2`, [body.id, user.id])).rows[0];
+      if (!row) fail('Session not found.', 404);
+      if (['completed', 'declined', 'cancelled'].includes(row.status)) fail('This session is already closed. Contact Goddess in Private Messages about any cancellation or payment questions.', 409);
+      fail('Contact Goddess in Private Messages to request a cancellation. You can withdraw consent immediately without waiting for a reply.', 409);
+      break;
+    }
+    case 'withdraw-consent': {
       await db.transaction(async client => {
         const row = (await client.query(`SELECT * FROM ${t.bookings} WHERE id=$1 AND user_id=$2 FOR UPDATE`, [body.id, user.id])).rows[0];
         if (!row) fail('Session not found.', 404);
@@ -145,6 +152,7 @@ export async function portalPost(db, user, body) {
         const details = unseal(row.details);
         details.consent = false;
         details.withdrawnAt = new Date().toISOString();
+        details.closureReason = 'consent_withdrawn';
         await client.query(`UPDATE ${t.bookings} SET status='cancelled',details=$1 WHERE id=$2`, [seal(details), row.id]);
       });
       break;

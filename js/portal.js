@@ -1,6 +1,7 @@
 import { plans, tiers, tierFor, formatPrice } from './membership.js';
 import { paymentPreference, paymentReplyEmail, paymentEmailStatusMessage } from './payment-contact.js';
 import { initMemberNavigation } from './member-navigation.js';
+import { initAdminNavigation } from './admin-navigation.js';
 
 export function initPortal(options = {}) {
   const window = options.window || globalThis.window;
@@ -13,9 +14,11 @@ export function initPortal(options = {}) {
   let data;
   let disposed = false, lastUnread = -1, notificationRevision = 0;
   let notificationPoll, messageRefresh, readAcknowledgment;
+  let adminConversationId;
+  const adminMessageDrafts = new Map();
   const navigation = memberPage ? initMemberNavigation({ window, onSelect(id) {
     if (id === 'messages' && data) void refreshMessages().catch(notificationError);
-  } }) : null;
+  } }) : document.body.dataset.admin === 'true' ? initAdminNavigation({ window }) : null;
   const el = (tag, copy, className) => {
     const node = document.createElement(tag);
     if (copy !== undefined) node.textContent = copy;
@@ -28,7 +31,7 @@ export function initPortal(options = {}) {
   const section = (id, heading, description) => {
     const node = el('section', undefined, 'portal-section'); node.id = id;
     if (memberPage) { node.dataset.portalView = id; node.hidden = navigation.current !== id; node.setAttribute('aria-labelledby', 'member-view-title'); }
-    else node.append(el('h2', heading));
+    else { node.dataset.adminView = id; node.hidden = window.location.hash.slice(1) !== id; node.append(el('h2', heading)); }
     if (description) node.append(el('p', description, 'muted'));
     root.append(node); return node;
   };
@@ -58,10 +61,15 @@ export function initPortal(options = {}) {
   function report(message) { status.textContent = message; status.scrollIntoView?.({ block: 'nearest' }); }
   async function save(payload) {
     const response = await request('/api/portal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (response.status === 401 || (document.body.dataset.admin === 'true' && response.status === 403)) { sessionEnded(response); return; }
     if (response.status === 402) { await load(); navigation?.select('membership'); report('Activate a membership to unlock this feature. Private chat remains available.'); return; }
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Unable to save. Please try again.');
-    await load(); report(payload.action === 'book' ? 'Request submitted—awaiting Mistress approval. Your appointment is not yet confirmed.' : payload.action === 'payment-reply' ? 'Reply saved in the member’s checkout. Use Email this reply to send it from your email app.' : 'Saved. Your private space is up to date.');
+    if (payload.action === 'message' && data?.user.role === 'admin') {
+      if (result.success !== true) throw new Error('Your message could not be confirmed. Your draft is preserved.');
+      if (adminMessageDrafts.get(payload.userId) === payload.message) adminMessageDrafts.delete(payload.userId);
+    }
+    await load(); report(payload.action === 'withdraw-consent' ? 'Consent withdrawn. This session has been stopped. Contact Goddess in Private Messages for cancellation or refund arrangements.' : payload.action === 'book' ? 'Request submitted—awaiting Mistress approval. Your appointment is not yet confirmed.' : payload.action === 'payment-reply' ? 'Reply saved in the member’s checkout. Use Email this reply to send it from your email app.' : 'Saved. Your private space is up to date.');
   }
   const form = (parent, action, caption, extra = {}) => {
     const node = el('form');
@@ -92,6 +100,47 @@ export function initPortal(options = {}) {
   };
   const tierChoices = tiers.map(t => [t.id, t.name]);
   const ranks = tiers.map(t => [String(t.rank), t.name]);
+  const displayStatus = value => String(value || '').replaceAll('_', ' ').replace(/^./, initial => initial.toUpperCase());
+  function disclosure(parent, title) {
+    const node = el('details', undefined, 'admin-create'); node.append(el('summary', title)); parent.append(node); return node;
+  }
+  function recordCollection(area, items, { searchLabel, filterLabel, choices, searchText, filterValue, render, empty }) {
+    const tools = el('div', undefined, 'admin-toolbar');
+    const search = field(tools, '', searchLabel, 'search'); search.placeholder = searchLabel;
+    const filter = field(tools, '', filterLabel, 'text', '', choices);
+    const count = el('p', '', 'admin-record-count'); count.setAttribute('role', 'status');
+    const list = el('div', undefined, 'admin-record-list');
+    const entries = items.map(item => { const node = render(item); list.append(node); return { item, node }; });
+    const noMatches = el('p', empty, 'empty'); list.append(noMatches);
+    function apply() {
+      const query = search.value.trim().toLocaleLowerCase(); let visible = 0;
+      for (const { item, node } of entries) {
+        node.hidden = !!(query && !searchText(item).toLocaleLowerCase().includes(query)) || !!(filter.value && filterValue(item) !== filter.value);
+        if (!node.hidden) visible++;
+      }
+      count.textContent = `${visible} of ${items.length} record${items.length === 1 ? '' : 's'}`;
+      noMatches.hidden = visible > 0;
+      noMatches.textContent = items.length ? 'No matching records. Try another search or filter.' : empty;
+    }
+    search.addEventListener('input', apply); filter.addEventListener('change', apply);
+    area.append(tools, count, list); apply();
+  }
+  function cancellationHelp(parent) {
+    const note = el('div', undefined, 'record cancellation-help');
+    note.append(el('h3', 'Cancellation help'), el('p', 'After registration, contact Goddess in Private Messages for membership or session cancellations and any refund request. She will guide you through the process. Private chat is available without a paid plan. You may withdraw consent at any time.'), link('Contact Goddess about cancellation', '#messages'));
+    note.querySelector('a').dataset.cancellationHelp = '';
+    parent.append(note);
+  }
+  function openCancellationChat(session) {
+    navigation?.select('messages');
+    const composer = document.querySelector('#messages textarea[name=message]');
+    if (!composer) return;
+    if (!composer.value.trim()) {
+      composer.value = session ? `Hello Goddess, I would like to request cancellation of my session on ${when(session.starts_at)} (reference ${session.id}). Please let me know the next steps.` : 'Hello Goddess, I would like help with a cancellation. Please let me know the next steps.';
+      report('Your cancellation message is ready to edit. Select Send private message when you are ready.');
+    } else report('Your existing message draft is preserved. Add your cancellation details and send it to Goddess when you are ready.');
+    composer.focus();
+  }
   function renderOverview() {
     const overview = document.querySelector('#member-overview');
     if (!overview) return;
@@ -111,6 +160,7 @@ export function initPortal(options = {}) {
       const welcome = el('section', undefined, 'record next-appointment');
       welcome.append(el('h3', 'Your account is ready'), el('p', 'Start a private conversation with the Mistress at any time. Choose and activate a membership when you are ready to unlock the other dashboard features.'), link('Chat with the Mistress', '#messages'), link('Choose a membership', '#membership'));
       overview.append(welcome);
+      cancellationHelp(overview);
       overview.setAttribute('aria-busy', 'false');
       return;
     }
@@ -146,6 +196,7 @@ export function initPortal(options = {}) {
       published.append(entry);
     }
     overview.append(published);
+    cancellationHelp(overview);
     overview.setAttribute('aria-busy', 'false');
   }
   function renderProfile() {
@@ -222,10 +273,13 @@ export function initPortal(options = {}) {
   function renderSessions(admin) {
     if (!admin && !hasPaidAccess()) { lockedSection('sessions', 'Session Records'); return; }
     const area = section('sessions', 'Session Records', admin ? 'Review requests, screening, agreed fees and consent before confirming. Rescheduling requires the member to accept again.' : 'Your requests and session history. Meeting links and exact locations appear only after confirmation.');
-    if (!data.bookings.length) area.append(el('p', 'No session records yet.', 'empty'));
+    if (!admin) area.append(el('p', 'Contact Goddess in Private Messages for cancellation and refund arrangements. You may withdraw consent immediately without waiting for a reply.', 'muted'));
+    if (!admin && !data.bookings.length) area.append(el('p', 'No session records yet.', 'empty'));
+    const records = new Map();
     for (const session of data.bookings) {
       const card = el('article', undefined, 'record');
       card.append(el('h3', `${admin ? session.name + ' · ' : ''}${session.format === 'in-person' ? 'In-person session' : 'Online / ' + session.format}`), el('span', session.status, 'badge'), el('p', slotLabel(session)), el('p', `Session fee: ${formatPrice(session.fee_cents / 100)} · Payment: ${session.payment_status.replaceAll('_', ' ')}`));
+      if (session.details.closureReason === 'consent_withdrawn') card.append(el('p', 'Consent withdrawn · Session stopped. Cancellation and any refund arrangements are handled by Goddess.', 'muted'));
       if (session.details.request) card.append(el('p', session.details.request));
       if (session.details.memberNote) card.append(el('p', `From the Mistress: ${session.details.memberNote}`));
       if (session.details.location) card.append(el('p', `Private meeting details: ${session.details.location}`));
@@ -243,27 +297,36 @@ export function initPortal(options = {}) {
         f.finish(); card.append(disclosure);
       } else if (!['cancelled', 'declined', 'completed'].includes(session.status)) {
         if (session.status === 'rescheduled') button(card, 'Accept new time and renew consent', () => save({ action: 'accept-reschedule', id: session.id, consent: true }));
-        button(card, 'Cancel request / withdraw consent', () => save({ action: 'cancel', id: session.id }), true);
+        button(card, 'Contact Goddess about cancellation', () => openCancellationChat(session), true);
+        button(card, 'Withdraw consent now', () => save({ action: 'withdraw-consent', id: session.id }), true);
       }
-      area.append(card);
+      if (admin) records.set(session.id, card); else area.append(card);
     }
+    if (admin) recordCollection(area, data.bookings, {
+      searchLabel: 'Search sessions', filterLabel: 'Session status',
+      choices: [['', 'All statuses'], ...['requested', 'confirmed', 'rescheduled', 'declined', 'completed', 'cancelled'].map(value => [value, displayStatus(value)])],
+      searchText: item => `${item.name} ${item.id} ${slotLabel(item)}`, filterValue: item => item.status,
+      render: item => records.get(item.id), empty: 'No session records yet.'
+    });
   }
   function renderMessageList(area, admin) {
     const list = area.querySelector('.message-list');
     list.replaceChildren();
-    if (!data.messages.length) list.append(el('p', 'No private messages yet.', 'empty'));
-    for (const message of data.messages) {
+    const messages = admin ? data.messages.filter(message => message.user_id === adminConversationId) : data.messages;
+    if (!messages.length) list.append(el('p', 'No private messages yet.', 'empty'));
+    for (const message of messages) {
       const unread = !admin && message.sender === 'mistress' && !message.member_read_at;
       const card = el('article', undefined, `record message-record${unread ? ' message-unread' : ''}`);
       card.dataset.messageId = message.id;
       const heading = el('div', undefined, 'message-heading');
-      heading.append(el('h3', `${message.sender === 'mistress' ? 'The Mistress' : message.name}${admin ? ' · ' + message.name : ''}`), el('small', when(message.created_at)));
+      heading.append(el('h3', message.sender === 'mistress' ? 'Goddess Ivy' : message.name), el('small', when(message.created_at)));
       if (unread) heading.append(el('span', 'New', 'badge message-new'));
       card.append(heading, el('p', message.body)); list.append(card);
     }
   }
   function renderMessages(admin) {
     const area = section('messages', admin ? 'Private Conversations' : 'Private Messages', data.responseWindow);
+    if (admin) { renderAdminMessages(area); return; }
     if (!admin) {
       area.append(el('p', 'Private chat is always available, with or without a paid membership.', 'message-allowance'));
       button(area, 'Refresh messages', refreshMessages, true);
@@ -277,11 +340,38 @@ export function initPortal(options = {}) {
     if (!admin && !data.user.adultConfirmed) field(f.node, 'adultConfirmed', 'I confirm that I am 18 or older.', 'checkbox').required = true;
     f.finish();
   }
+  function renderAdminMessages(area) {
+    button(area, 'Refresh conversations', load, true);
+    const members = data.members.filter(member => member.role !== 'admin');
+    if (!members.length) { area.append(el('p', 'Private conversations will appear when members register.', 'empty')); return; }
+    const latest = new Map();
+    for (const message of data.messages) latest.set(message.user_id, message);
+    const ordered = [...members].sort((a, b) => new Date(latest.get(b.id)?.created_at || 0) - new Date(latest.get(a.id)?.created_at || 0));
+    if (!members.some(member => member.id === adminConversationId)) adminConversationId = ordered[0].id;
+    const f = form(area, 'message', 'Send private message');
+    const recipient = field(f.node, 'userId', 'Conversation', 'text', adminConversationId, ordered.map(member => [member.id, `${member.name}${latest.get(member.id)?.sender === 'member' ? ' · Awaiting reply' : ''}`]));
+    const heading = el('div', undefined, 'admin-conversation-head'); f.node.append(heading);
+    const list = el('div', undefined, 'message-list'); f.node.append(list);
+    const composer = field(f.node, 'message', 'Message', 'textarea', adminMessageDrafts.get(adminConversationId) || ''); composer.required = true;
+    composer.addEventListener('input', () => adminMessageDrafts.set(adminConversationId, composer.value));
+    function showConversation() {
+      const member = members.find(member => member.id === adminConversationId);
+      heading.replaceChildren(el('h3', member.name), el('p', member.email, 'muted'));
+      renderMessageList(area, true);
+    }
+    recipient.addEventListener('change', () => {
+      adminMessageDrafts.set(adminConversationId, composer.value);
+      adminConversationId = recipient.value;
+      composer.value = adminMessageDrafts.get(adminConversationId) || '';
+      showConversation();
+    });
+    f.finish(); showConversation();
+  }
   function renderContent(admin) {
     if (!admin && !hasPaidAccess()) { lockedSection('content', 'Exclusive Content'); return; }
     const area = section('content', 'Exclusive Content', 'Access follows your current membership. Private downloads require an active session.');
     if (admin) {
-      const f = form(area, 'content', 'Publish content');
+      const f = form(disclosure(area, 'Publish new content'), 'content', 'Publish content');
       field(f.node, 'title', 'Title').required = true;
       field(f.node, 'minRank', 'Minimum membership', 'text', '1', ranks);
       field(f.node, 'text', 'Content or event information', 'textarea').maxLength = 12000;
@@ -296,19 +386,23 @@ export function initPortal(options = {}) {
     }
   }
   function renderAdmin() {
-    const members = section('members', 'Registered Submissives', 'Membership grants are manual and expire on the date you choose. The Chosen One is invitation-only. Suspension revokes existing login sessions.');
-    for (const member of data.members.filter(m => m.role !== 'admin')) {
+    const members = section('members', 'Members', 'Review profiles and manage membership access. Membership grants expire on your chosen date. Suspending an account revokes its current login sessions.');
+    recordCollection(members, data.members.filter(member => member.role !== 'admin'), {
+      searchLabel: 'Search members', filterLabel: 'Member access',
+      choices: [['', 'All members'], ['active', 'Active memberships'], ['inactive', 'No active membership'], ['suspended', 'Suspended']],
+      searchText: member => `${member.name} ${member.email} ${tierFor(member.tier).name}`,
+      filterValue: member => member.suspended ? 'suspended' : isActiveMember(member) ? 'active' : 'inactive',
+      empty: 'No members have registered yet.', render: member => {
       const card = el('details', undefined, 'record'); card.append(el('summary', `${member.name} · ${tierFor(member.tier).name}${member.suspended ? ' · Suspended' : ''}`), el('p', member.email));
       const profile = data.profiles.find(p => p.userId === member.id);
       if (profile) card.append(el('p', `Bio: ${profile.bio || 'Not set'}\nInterests and fantasies: ${profile.fantasies || 'Not set'}\nBoundaries: ${profile.boundaries || 'Not set'}\nPreferences: ${profile.preferences || 'Not set'}\nTime zone: ${profile.timezone || 'Not set'}`));
       const f = form(card, 'member', 'Update access', { userId: member.id });
       field(f.node, 'tier', 'Membership', 'text', member.tier, tierChoices);
       field(f.node, 'until', 'Paid access expires (UTC)', 'date', member.membershipUntil?.slice(0, 10));
-      field(f.node, 'suspended', 'Suspend this account', 'checkbox', member.suspended); f.finish(); members.append(card);
-    }
-    if (!data.members.some(m => m.role !== 'admin')) members.append(el('p', 'No submissives have registered yet.', 'empty'));
+      field(f.node, 'suspended', 'Suspend this account', 'checkbox', member.suspended); f.finish(); return card;
+    } });
     const schedule = section('schedule', 'Availability', 'Publish separate online and in-person windows. Times entered here use your device’s time zone. Only a general city or area is public to eligible members.');
-    const f = form(schedule, 'availability', 'Open appointment window');
+    const f = form(disclosure(schedule, 'Add appointment window'), 'availability', 'Open appointment window');
     field(f.node, 'format', 'Format', 'text', 'video', [['video', 'Online · Video'], ['audio', 'Online · Audio'], ['text', 'Online · Secure text'], ['in-person', 'In person']]);
     field(f.node, 'startsAt', 'Date and time', 'datetime-local').required = true;
     field(f.node, 'duration', 'Duration', 'text', '60', [30, 60, 90, 120].map(n => [String(n), `${n} minutes`]));
@@ -321,6 +415,28 @@ export function initPortal(options = {}) {
       for (const slot of slots) { const row = el('div', undefined, 'record'); row.append(el('p', slotLabel(slot))); button(row, slot.enabled ? 'Close window' : 'Reopen window', () => save({ action: 'availability', id: slot.id, enabled: !slot.enabled }), true); group.append(row); }
       schedule.append(group);
     }
+  }
+  function isActiveMember(member) {
+    return !member.suspended && tierFor(member.tier).rank > 0 && new Date(member.membershipUntil) > new Date();
+  }
+  function renderAdminOverview() {
+    const overview = document.querySelector('#admin-overview-summary');
+    if (!overview) return;
+    const members = data.members.filter(member => member.role !== 'admin');
+    const conversations = new Map();
+    for (const message of data.messages) conversations.set(message.user_id, message);
+    overview.replaceChildren();
+    for (const [label, value, href] of [
+      ['Registered members', members.length, '#members'],
+      ['Active memberships', members.filter(isActiveMember).length, '#members'],
+      ['Payment requests awaiting reply', data.paymentRequests.filter(item => item.status === 'pending_instructions').length, '#payment-requests'],
+      ['Session requests awaiting review', data.bookings.filter(item => item.status === 'requested').length, '#sessions'],
+      ['Conversations awaiting reply', [...conversations.values()].filter(item => item.sender === 'member').length, '#messages']
+    ]) {
+      const card = el('a', undefined, 'admin-summary-card'); card.href = href;
+      card.append(el('span', String(value), 'stat'), el('span', label)); overview.append(card);
+    }
+    overview.setAttribute('aria-busy', 'false');
   }
   function renderPayments(admin) {
     if (!admin && !hasPaidAccess()) { lockedSection('payments', 'Payments'); return; }
@@ -343,7 +459,7 @@ export function initPortal(options = {}) {
     area.append(el('p', formatPrice(subscriptions / 100), 'stat'), el('p', 'Membership payments manually marked paid. Recording payment does not automatically activate access.'));
     const paidMembers = data.members.filter(m => m.role !== 'admin');
     if (paidMembers.length) {
-      const f = form(area, 'membership-payment', 'Record membership payment');
+      const f = form(disclosure(area, 'Record a membership payment'), 'membership-payment', 'Record membership payment');
       field(f.node, 'userId', 'Member', 'text', '', paidMembers.map(m => [m.id, m.name]));
       field(f.node, 'tier', 'Membership', 'text', 'supporter', tierChoices.filter(([id]) => id !== 'observer'));
       const amount = field(f.node, 'amount', 'Amount (USD)', 'number'); amount.required = true; amount.min = '0'; amount.step = '.01';
@@ -354,8 +470,11 @@ export function initPortal(options = {}) {
   function renderPaymentRequests() {
     const area = section('payment-requests', 'Payment inbox', 'Members can ask what is available or share their preferred method before paying. Confirm an available option and save your reply; it appears in their checkout.');
     button(area, 'Refresh payment requests', load, true);
-    if (!data.paymentRequests.length) area.append(el('p', 'No membership payment requests yet.', 'empty'));
-    for (const payment of data.paymentRequests) {
+    recordCollection(area, data.paymentRequests, {
+      searchLabel: 'Search payment requests', filterLabel: 'Request status',
+      choices: [['', 'All requests'], ['pending_instructions', 'Awaiting reply'], ['instructions_ready', 'Reply saved']],
+      searchText: payment => `${payment.name} ${payment.email} ${payment.id} ${tierFor(payment.plan_id).name}`,
+      filterValue: payment => payment.status, empty: 'No membership payment requests yet.', render: payment => {
       const card = el('article', undefined, 'record');
       card.append(el('h3', `${payment.name} · ${tierFor(payment.plan_id).name}`),
         el('span', payment.status === 'pending_instructions' ? 'Awaiting your reply' : 'Reply saved', 'badge'),
@@ -371,19 +490,22 @@ export function initPortal(options = {}) {
       if (payment.instructions) {
         card.append(link('Email this reply', paymentReplyEmail(payment)), el('p', 'Opens your email app with the saved reply. Press Send there to deliver it. Save any changes above before emailing.', 'muted'));
       }
-      area.append(card);
-    }
+      return card;
+    } });
   }
   function updatePaymentAlert(pending) {
     const count = document.querySelector('#pending-payment-count');
     const alert = document.querySelector('#payment-alert');
     if (count) count.textContent = String(pending);
+    const total = document.querySelector('#admin-overview-summary a[href="#payment-requests"] .stat');
+    if (total) total.textContent = String(pending);
     if (alert) alert.textContent = pending ? `${pending} payment request${pending === 1 ? '' : 's'} awaiting your reply. Open the payment inbox to review.` : 'No payment requests are waiting for your reply.';
   }
   async function checkPaymentNotifications() {
     if (document.hidden || document.body.dataset.admin !== 'true' || data?.user.role !== 'admin') return;
     try {
       const response = await request('/api/payment-requests/pending');
+      if (disposed || sessionEnded(response)) return;
       if (!response.ok) throw new Error();
       updatePaymentAlert((await response.json()).pending);
     } catch {
@@ -410,9 +532,11 @@ export function initPortal(options = {}) {
   function sessionEnded(response) {
     if (![401, 403].includes(response.status)) return false;
     data = null;
+    adminMessageDrafts.clear(); adminConversationId = undefined;
     root.replaceChildren();
     const overview = document.querySelector('#overview');
     if (memberPage && overview) { overview.replaceChildren(); overview.hidden = true; }
+    document.querySelector('#admin-overview-summary')?.replaceChildren();
     updateMessageCount(0);
     navigate('login.html');
     return true;
@@ -485,9 +609,12 @@ export function initPortal(options = {}) {
     })();
     return notificationPoll;
   }
-  document.querySelector('#review-payment-requests')?.addEventListener('click', async event => {
-    event.preventDefault(); await load(); document.querySelector('#payment-requests')?.scrollIntoView?.({ block: 'start' });
-  });
+  const cancellationClick = event => {
+    if (memberPage && event.target.closest?.('[data-cancellation-help]') && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault(); openCancellationChat();
+    }
+  };
+  document.addEventListener('click', cancellationClick);
   async function reloadAccess() {
     const composer = document.querySelector('#messages textarea[name=message]');
     const draft = composer?.value;
@@ -510,7 +637,7 @@ export function initPortal(options = {}) {
       document.querySelector('#membership-status').textContent = admin ? 'Private administration · Goddess Ivy' : hasPaidAccess() ? `${data.tier.name} · Active membership` : 'Private chat available';
       root.replaceChildren();
       if (!admin) renderOverview();
-      if (admin) { updatePaymentAlert(data.paymentRequests.filter(request => request.status === 'pending_instructions').length); renderPaymentRequests(); renderAdmin(); } else renderMember();
+      if (admin) { renderAdminOverview(); updatePaymentAlert(data.paymentRequests.filter(request => request.status === 'pending_instructions').length); renderPaymentRequests(); renderAdmin(); } else renderMember();
       renderSessions(admin); renderMessages(admin); renderContent(admin); renderPayments(admin); renderProfile();
       if (memberPage) {
         for (const item of document.querySelectorAll('#member-menu nav a')) {
@@ -521,11 +648,14 @@ export function initPortal(options = {}) {
         navigation.refresh(); updateMessageCount(data.unreadMessages || 0);
       }
       root.setAttribute('aria-busy', 'false');
+      if (admin) document.dispatchEvent(new window.CustomEvent('admin:updated'));
       if (memberPage) await acknowledgeMessages();
     } catch (error) {
       root.replaceChildren(); root.setAttribute('aria-busy', 'false');
       const overview = document.querySelector('#member-overview');
       if (overview) { overview.replaceChildren(); overview.setAttribute('aria-busy', 'false'); }
+      const adminOverview = document.querySelector('#admin-overview-summary');
+      if (adminOverview) { adminOverview.replaceChildren(); adminOverview.setAttribute('aria-busy', 'false'); }
       report(error.message || 'Unable to load your private space. Please refresh.');
     }
   }
@@ -535,6 +665,7 @@ export function initPortal(options = {}) {
   function destroy() {
     disposed = true; window.clearInterval(timer); navigation?.destroy();
     document.removeEventListener('visibilitychange', visibilityChange);
+    document.removeEventListener('click', cancellationClick);
   }
   window.addEventListener('pagehide', destroy, { once: true });
   return { ready: load(), checkPaymentNotifications, checkMessageNotifications, refreshMessages, acknowledgeMessages, navigation, destroy };

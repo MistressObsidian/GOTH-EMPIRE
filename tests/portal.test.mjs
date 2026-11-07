@@ -44,7 +44,7 @@ test('private portal preserves free chat while enforcing paid features, ownershi
     assert.equal((await get('/dashboard.html', member.cookie)).status, 200);
     assert.equal((await get('/checkout.html')).status, 302);
     assert.equal((await get('/checkout.html', member.cookie)).status, 200);
-    for (const action of ['profile', 'book', 'accept-reschedule', 'member', 'content', 'membership-payment', 'cancel', 'payment-reply']) {
+    for (const action of ['profile', 'book', 'accept-reschedule', 'member', 'content', 'membership-payment', 'payment-reply']) {
       assert.equal((await post({ action }, member.cookie)).status, 402);
     }
     await success({ action: 'message', message: 'A conversation before payment', userId: stranger.id }, member.cookie);
@@ -82,6 +82,12 @@ test('private portal preserves free chat while enforcing paid features, ownershi
     await success(session, mistress.cookie);
     portal = await (await get('/api/portal', member.cookie)).json(); assert.equal(portal.bookings[0].details.location, undefined); assert.equal(portal.bookings[0].details.privateNotes, undefined);
     assert.equal((await post({ action: 'cancel', id }, stranger.cookie)).status, 404);
+    assert.equal((await post({ action: 'withdraw-consent', id }, stranger.cookie)).status, 404);
+    const beforeCancellation = (await fixture.db.query(`SELECT * FROM ${t.bookings} WHERE id=$1`, [id])).rows[0];
+    const cancellation = await post({ action: 'cancel', id }, member.cookie);
+    assert.equal(cancellation.status, 409);
+    assert.match((await cancellation.json()).error, /Contact Goddess in Private Messages/);
+    assert.deepEqual((await fixture.db.query(`SELECT * FROM ${t.bookings} WHERE id=$1`, [id])).rows[0], beforeCancellation, 'a cancellation request must not alter the booking, consent or payment record');
     assert.equal((await post({ ...session, status: 'confirmed' }, mistress.cookie)).status, 400);
     await success({ ...session, status: 'confirmed', screened: true }, mistress.cookie);
     portal = await (await get('/api/portal', member.cookie)).json(); assert.equal(portal.bookings[0].details.location, 'Private address');
@@ -97,8 +103,13 @@ test('private portal preserves free chat while enforcing paid features, ownershi
     await success({ action: 'accept-reschedule', id, consent: true }, member.cookie);
     await success({ ...rescheduled, status: 'confirmed' }, mistress.cookie);
     other = await (await get('/api/portal', stranger.cookie)).json(); assert.equal(other.bookings.length, 0);
-    await success({ action: 'cancel', id }, member.cookie);
+    await success({ ...rescheduled, status: 'cancelled' }, mistress.cookie);
+    const adminCancelled = (await fixture.db.query(`SELECT * FROM ${t.bookings} WHERE id=$1`, [id])).rows[0];
+    assert.equal(adminCancelled.status, 'cancelled', 'Goddess can process a session cancellation');
+    assert.equal(adminCancelled.payment_status, 'pending', 'cancellation alone is not a refund');
     assert.equal((await post({ ...session, status: 'confirmed', screened: true }, mistress.cookie)).status, 409);
+    await success({ action: 'book', slotId, notes: 'A second appointment', consent: true, screening: true }, member.cookie);
+    const withdrawalBooking = (await (await get('/api/portal', member.cookie)).json()).bookings.find(booking => booking.id !== id);
     for (let i = 0; i < 5; i++) await success({ action: 'message', message: `<b>Private ${i}</b>` }, member.cookie);
     await success({ action: 'message', message: 'Chat continues beyond the former quota' }, member.cookie);
     assert.equal((await (await get('/api/portal/messages', member.cookie)).json()).messageAllowance.unlimited, true);
@@ -149,6 +160,18 @@ test('private portal preserves free chat while enforcing paid features, ownershi
     assert.equal((await post({ action: 'messages-read', ids: [replyId] }, member.cookie)).status, 200);
     assert.equal((await get('/dashboard.html', member.cookie)).status, 200);
     await success({ action: 'message', message: 'I can still chat after my membership expires.' }, member.cookie);
+    const expiredCancellation = await post({ action: 'cancel', id: withdrawalBooking.id }, member.cookie);
+    assert.equal(expiredCancellation.status, 409);
+    assert.match((await expiredCancellation.json()).error, /Contact Goddess/);
+    await success({ action: 'withdraw-consent', id: withdrawalBooking.id }, member.cookie);
+    const withdrawn = (await fixture.db.query(`SELECT * FROM ${t.bookings} WHERE id=$1`, [withdrawalBooking.id])).rows[0];
+    assert.equal(withdrawn.status, 'cancelled', 'consent withdrawal immediately stops the appointment even after membership expiry');
+    assert.equal(withdrawn.payment_status, 'not_requested');
+    const withdrawnDetails = unseal(withdrawn.details);
+    assert.equal(withdrawnDetails.consent, false);
+    assert.equal(withdrawnDetails.closureReason, 'consent_withdrawn');
+    assert.ok(Number.isFinite(Date.parse(withdrawnDetails.withdrawnAt)));
+    assert.equal((await post({ ...session, id: withdrawalBooking.id, status: 'confirmed', screened: true }, mistress.cookie)).status, 409, 'a consent-withdrawn session cannot be confirmed again');
     assert.equal((await post({ action: 'profile', name: 'Blocked change', adultConfirmed: true }, member.cookie)).status, 402);
     assert.equal((await get(`/api/portal/content-file?id=${contentId}`, member.cookie)).status, 402);
     await success({ action: 'member', userId: member.id, tier: 'observer', suspended: true }, mistress.cookie);
