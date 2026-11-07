@@ -40,6 +40,60 @@ async function setup(hash = '', intercept = () => {}) {
   return { dom, state, portal, calls, redirects, document: dom.window.document, cleanup() { portal.destroy(); dom.window.close(); } };
 }
 const visibleViews = document => [...document.querySelectorAll('[data-portal-view]')].filter(panel => !panel.hidden).map(panel => panel.dataset.portalView);
+function deactivate(state) {
+  state.user.tier = 'observer'; state.user.membershipUntil = null;
+  state.tier = { id: 'observer', name: 'No active membership', rank: 0 };
+  state.access = { paid: false };
+}
+
+test('unpaid accounts can use chat and view plans while all paid workspaces remain locked', async () => {
+  const f = await setup('', ({ state }) => { deactivate(state); });
+  try {
+    assert.match(f.document.querySelector('#member-overview').textContent, /Your account is ready/);
+    assert.equal(f.document.querySelectorAll('.membership-plan').length, 3);
+    for (const id of ['profile', 'book', 'sessions', 'content', 'payments']) {
+      assert.equal(f.document.getElementById(id).dataset.locked, 'true');
+      assert.equal(f.document.querySelector(`#${id} form`), null);
+    }
+    assert.equal(f.document.querySelectorAll('.nav-lock').length, 5);
+    f.portal.navigation.select('messages'); await f.portal.refreshMessages();
+    assert.ok(f.document.querySelector('#messages textarea[name=message]'));
+    assert.equal(f.document.querySelector('[data-unread-count]').hidden, true);
+    assert.deepEqual(f.redirects, []);
+  } finally { f.cleanup(); }
+});
+
+test('plan selection waits for a matching saved-plan acknowledgment before opening checkout', async () => {
+  let valid = false;
+  const f = await setup('#membership', ({ state, body, response }) => {
+    deactivate(state);
+    if (body?.action === 'select-plan') return response(valid ? { success: true, selectedPlan: body.planId } : { success: true, selectedPlan: 'different-plan' });
+  });
+  try {
+    const choose = f.document.querySelector('[data-plan-id="supporter"] button');
+    choose.click(); await flush(); await flush();
+    assert.deepEqual(f.redirects, []);
+    assert.match(f.document.querySelector('#portal-status').textContent, /Unable to save your plan/);
+    valid = true; choose.click(); await flush(); await flush();
+    assert.deepEqual(f.redirects, ['checkout.html?plan=supporter']);
+    assert.deepEqual(f.calls.find(call => call.body?.action === 'select-plan').body, { action: 'select-plan', planId: 'supporter' });
+  } finally { f.cleanup(); }
+});
+
+test('membership expiry locks paid features without interrupting chat or discarding its draft', async () => {
+  const f = await setup('#messages');
+  try {
+    const draft = f.document.querySelector('#messages textarea[name=message]'); draft.value = 'Keep this private reply'; draft.focus();
+    deactivate(f.state);
+    await f.portal.checkMessageNotifications();
+    const current = f.document.querySelector('#messages textarea[name=message]');
+    assert.equal(current.value, 'Keep this private reply');
+    assert.equal(f.document.activeElement, current);
+    assert.equal(f.document.querySelector('#profile').dataset.locked, 'true');
+    assert.deepEqual(visibleViews(f.document), ['messages']);
+    assert.deepEqual(f.redirects, []);
+  } finally { f.cleanup(); }
+});
 
 test('menu navigation shows one section, preserves drafts, supports deep links and Escape', async () => {
   const f = await setup();

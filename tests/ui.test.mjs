@@ -46,7 +46,7 @@ test('every page, internal link, image, stylesheet, script, and stylesheet image
   } finally { for (const dom of parsed.values()) dom.window.close(); }
 });
 
-test('homepage menu and all join links work with canonical plan prices', async () => {
+test('homepage encourages registration and has no membership catalog, prices or checkout links', async () => {
   const dom = await page('index.html');
   try {
     initHome(dom.window);
@@ -56,24 +56,25 @@ test('homepage menu and all join links work with canonical plan prices', async (
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     document.querySelector('.main-nav a').click();
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
-    for (const [index, card] of [...document.querySelectorAll('.plans .plan')].entries()) {
-      assert.match(card.querySelector('.price').textContent, new RegExp(`\\$${plans[index].price}`));
-      assert.equal(new URL(card.querySelector('a').href).searchParams.get('plan'), plans[index].id);
-    }
-    for (const link of document.querySelectorAll('a')) if (/join now|join the empire|get started today/i.test(link.textContent)) assert.equal(new URL(link.href).pathname, '/checkout.html');
+    assert.equal(document.querySelector('#membership'), null);
+    assert.equal(document.querySelector('.plans,.plan,.price,a[href*="checkout.html"],a[href="#membership"]'), null);
+    assert.doesNotMatch(document.body.textContent, /\$\d/);
+    assert.ok(document.querySelectorAll('a[href="register.html"]').length >= 3);
+    assert.ok(document.querySelector('a[href="dashboard.html#messages"]'));
     assert.equal(document.querySelector('a[href="dashboard.html"]').textContent, 'My Account');
   } finally { dom.window.close(); }
 });
 
-test('fractional prices keep their cents and the initial homepage matches the plan definitions', async () => {
+test('fractional prices keep their cents while registration has no plan selector', async () => {
   assert.equal(formatPrice(119.99), '$119.99');
-  const dom = await page('index.html');
+  const dom = await page('register.html');
   try {
-    for (const [index, card] of [...dom.window.document.querySelectorAll('.plans .plan')].entries()) assert.ok(card.querySelector('.price').textContent.startsWith(formatPrice(plans[index].price)));
+    assert.equal(dom.window.document.querySelector('#registration-plan'), null);
+    assert.doesNotMatch(dom.window.document.body.textContent, /\$\d/);
   } finally { dom.window.close(); }
 });
 
-test('registration requires adult confirmation, prevents mismatched passwords and opens checkout', async () => {
+test('registration requires adult confirmation, prevents mismatched passwords and opens the dashboard without a plan', async () => {
   const dom = await page('register.html');
   const calls = [];
   const redirects = [];
@@ -82,7 +83,7 @@ test('registration requires adult confirmation, prevents mismatched passwords an
     assert.equal(document.querySelector('form').method, 'post');
     assert.equal(document.querySelector('#login-btn').disabled, true);
     const auth = initAuth({ window: dom.window, fetch: async (...args) => { calls.push(args); return response(201, { user: { id: 'test' } }); }, navigate: href => redirects.push(href) });
-    document.querySelector('#registration-plan').value = 'supporter';
+    assert.equal(document.querySelector('#registration-plan'), null);
     document.querySelector('#name').value = 'Test Member';
     document.querySelector('#email').value = 'member@example.test';
     document.querySelector('#password').value = 'long-test-password-123';
@@ -97,7 +98,8 @@ test('registration requires adult confirmation, prevents mismatched passwords an
     assert.equal(calls[0][0], '/api/register');
     assert.equal(calls[0][1].method, 'POST');
     assert.equal(JSON.parse(calls[0][1].body).name, 'Test Member');
-    assert.deepEqual(redirects, ['checkout.html?plan=supporter']);
+    assert.equal(JSON.parse(calls[0][1].body).planId, undefined);
+    assert.deepEqual(redirects, ['dashboard.html']);
     assert.equal(document.querySelector('#password').value, '');
     assert.equal(document.querySelector('.auth-button').getAttribute('href'), 'login.html');
   } finally { dom.window.close(); }
@@ -140,8 +142,8 @@ test('checkout switches payment preferences, preserves plan choice, and directs 
     assert.equal(document.querySelector('#gift-card-panel').hidden, false);
     assert.equal(document.querySelector('#paypal-panel').hidden, true);
     assert.equal(new URL(dom.window.location.href).searchParams.get('payment'), 'gift-card');
-    select(dom.window, 'input[value="elite"]');
-    assert.equal(document.querySelector('#plan-total').textContent, formatPrice(plans.find(plan => plan.id === 'elite').price));
+    assert.equal(document.querySelectorAll('#checkout-plans input').length, 1);
+    assert.equal(document.querySelector('a[href="dashboard.html#membership"]').textContent.includes('My Membership'), true);
     select(dom.window, 'input[value="card"]');
     assert.equal(document.querySelector('#checkout-payment').disabled, false);
     assert.equal(document.querySelector('#card-panel').hidden, false);

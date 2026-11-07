@@ -21,7 +21,7 @@ Wrangler now builds `dist/` from an explicit list of HTML pages and the `css/`, 
 
 The homepage and member dashboard share `videos/dashboard-background.mp4` with `images/dashboard-background.jpg` as their still fallback. Playback is muted, loops inline on mobile, and pauses when the page is hidden. Reduced-motion and data-saving preferences use the still image until the visitor explicitly selects Play background video. The pause preference is remembered for the current tab across both pages. The homepage control stays available while scrolling, including direct links to Membership. Replace these two media files to change the background; keep the MP4 below the asset limit. These are site assets, so the video contains no private member records.
 
-The Worker handles `/api/*`, `/admin`, `/admin.html`, `/dashboard` and `/dashboard.html` before serving any asset. It preserves the existing password hashes, secure session cookies, paid-membership gate and administrator checks. Database pools are opened and closed within each request so sockets are never shared across Worker requests. Public pages remain available when account settings are missing; account operations return 503 until configured.
+The Worker handles `/api/*`, `/admin`, `/admin.html`, `/dashboard`, `/dashboard.html`, `/checkout` and `/checkout.html` before serving assets. Dashboard and checkout require sign-in. The dashboard allows private chat and membership selection before payment; other features remain protected by server-side membership and administrator checks. Existing password hashes, secure session cookies and encrypted records are preserved. Database pools are opened and closed within each request. Public pages remain available when account settings are missing; account operations return 503 until configured.
 
 Workers connects to Neon with SCRAM-SHA-256 inside certificate-verified TLS. Its socket API does not expose the peer certificate required by SCRAM-SHA-256-PLUS channel binding. The Node.js hosting option retains channel binding. Existing account password hashes and the portal encryption key are preserved.
 
@@ -75,13 +75,13 @@ Keep `.env`, `data/`, backups, and `node_modules/` out of deployment uploads and
 | Page | Local preview | Expected behavior |
 | --- | --- | --- |
 | Homepage | http://127.0.0.1:5173/ | Mobile menu, feature links, membership prices, join links, and My Account navigation |
-| Registration | http://127.0.0.1:5173/register.html | Validates adult self-declaration and matching passwords, creates an Observer account and opens `dashboard.html` |
+| Registration | http://127.0.0.1:5173/register.html | Validates adult self-declaration and matching passwords, creates an account without a plan or payment, and opens `dashboard.html` |
 | Login | http://127.0.0.1:5173/login.html | Opens `dashboard.html` for members or `admin.html` for the trusted administrator role |
 | Checkout | http://127.0.0.1:5173/checkout.html?plan=inner-circle | Shows the selected plan and price; asks Mistress for available methods or shares a payment preference |
-| Submissive portal | http://127.0.0.1:5173/dashboard.html | Private profile, membership, bookings, history, messages, content and payments |
+| Submissive portal | http://127.0.0.1:5173/dashboard.html | Chat and membership selection for every signed-in account; profile, bookings, records, content and payment history require active paid access |
 | Mistress portal | http://127.0.0.1:5173/admin.html | Server-protected member access, schedule, session review, messages, content and manual payment records |
 
-The monthly prices are The Newcomer **$59.99**, The Loyal One **$119.99**, and The Privileged **$199.99**. The Observer is free; The Chosen One is invitation-only. `js/membership.js` is the shared source. Existing internal plan identifiers are retained. See [PORTAL_GUIDE.md](PORTAL_GUIDE.md) for the implemented workflows and service limitations.
+The dashboard's monthly plans are The Newcomer **$59.99**, The Loyal One **$119.99**, and The Privileged **$199.99**. The Chosen One is invitation-only. Private chat is available without payment or membership-based quotas. Plans are absent from the homepage and registration form. `js/membership.js` remains the shared price source and existing internal plan identifiers are retained. Selecting a plan and requesting payment instructions do not activate paid features. See [PORTAL_GUIDE.md](PORTAL_GUIDE.md) for the workflows.
 
 Payment requests save the chosen plan and preference (ask Mistress, card, PayPal, gift card or another service) in Neon. Migration 4 preserves existing requests and adds the new preferences. Mistress receives an in-app pending count and can respond in the admin **Payment inbox**. Local operators can also use `npm run payment-requests -- list` and `npm run payment-requests -- reply REQUEST_ID "instructions"`. Checkout checks for a response every 30 seconds while visible and offers a manual refresh. A saved request or a response does not confirm payment or activate membership.
 

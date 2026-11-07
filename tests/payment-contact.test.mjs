@@ -70,7 +70,7 @@ test('payment preferences reach the Mistress inbox, email drafts, and private ch
     assert.match(new URL(emailReply.href).searchParams.get('body'), /arrange bank transfer/);
     await checkoutApp.checkForReplies();
     assert.equal(doc.querySelector('#instructions-text').textContent, reply.value);
-    assert.equal((await member.request('/api/portal')).status, 402);
+    assert.equal((await member.request('/api/portal').then(response => response.json())).access.paid, false);
     assert.deepEqual((await (await stranger.request('/api/payment-requests')).json()).requests, []);
     assert.equal((await post(stranger.request, '/api/portal', { action: 'payment-reply', id: ask.id, instructions: 'Injected reply' })).status, 402);
     assert.equal((await post(mistress.request, '/api/portal', { action: 'payment-reply', id: 'missing', instructions: 'Reply' })).status, 404);

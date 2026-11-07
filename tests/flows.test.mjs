@@ -7,6 +7,7 @@ import { createApp } from '../server.mjs';
 import { initAuth } from '../js/login.js';
 import { initHome } from '../js/app.js';
 import { initCheckout } from '../js/checkout.js';
+import { initPortal } from '../js/portal.js';
 import { replyToPaymentRequest } from '../payment-requests.mjs';
 import { plans, formatPrice } from '../js/membership.js';
 
@@ -36,17 +37,17 @@ test('registration, login, membership, checkout requests, operator replies, and 
     }
     const registration = await page('/register.html');
     const auth = initAuth({ window: registration, fetch: request, navigate: href => redirects.push(href) });
-    registration.document.querySelector('#registration-plan').value = 'supporter';
+    assert.equal(registration.document.querySelector('#registration-plan'), null);
     registration.document.querySelector('#adult-confirmed').checked = true;
     registration.document.querySelector('#name').value = 'Flow Test';
     registration.document.querySelector('#email').value = 'flow@example.test';
     registration.document.querySelector('#password').value = 'flow-test-password-123';
     registration.document.querySelector('#confirm-password').value = 'flow-test-password-123';
     await auth.submit(new registration.Event('submit'));
-    assert.equal(redirects.at(-1), 'checkout.html?plan=supporter');
+    assert.equal(redirects.at(-1), 'dashboard.html');
     assert.equal((await fixture.db.query(`SELECT id FROM ${fixture.db.tables.users} WHERE email=$1`, ['flow@example.test'])).rowCount, 1);
 
-    // Inactive members remain on checkout, which has no dashboard logout control.
+    // Creating an account grants the dashboard shell and private chat, without paid features.
     const logout = () => request('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     assert.equal((await logout()).status, 200);
     assert.equal((await request('/api/me')).status, 401);
@@ -55,12 +56,22 @@ test('registration, login, membership, checkout requests, operator replies, and 
     login.document.querySelector('#email').value = 'flow@example.test';
     login.document.querySelector('#password').value = 'flow-test-password-123';
     await signingIn.submit(new login.Event('submit'));
-    assert.equal(redirects.at(-1), 'checkout.html?plan=supporter');
+    assert.equal(redirects.at(-1), 'dashboard.html');
 
-    const home = await page('/index.html#membership');
+    const home = await page('/index.html');
     initHome(home);
-    const join = home.document.querySelector('a[href="checkout.html?plan=inner-circle"]');
-    const checkout = await page(new URL(join.href).pathname + new URL(join.href).search + '&payment=paypal');
+    assert.equal(home.document.querySelector('#membership'), null);
+    const dashboard = await page('/dashboard.html#membership');
+    const portal = initPortal({ window: dashboard, fetch: request, navigate: href => redirects.push(href) });
+    await portal.ready;
+    assert.equal(dashboard.document.querySelector('#profile form'), null);
+    assert.ok(dashboard.document.querySelector('#messages textarea'));
+    assert.equal(dashboard.document.querySelectorAll('.membership-plan').length, 3);
+    dashboard.document.querySelector('[data-plan-id="inner-circle"] button').click();
+    const selectedDeadline = Date.now() + 30000;
+    while (!redirects.at(-1).startsWith('checkout.html?plan=') && Date.now() < selectedDeadline) await delay(25);
+    assert.equal(redirects.at(-1), 'checkout.html?plan=inner-circle');
+    const checkout = await page('/' + redirects.at(-1) + '&payment=paypal');
     await initCheckout({ window: checkout, fetch: request }).ready;
     assert.equal(checkout.document.querySelector('#plan-total').textContent, formatPrice(plans.find(plan => plan.id === 'inner-circle').price));
     const button = checkout.document.querySelector('#checkout-payment');
@@ -88,7 +99,9 @@ test('registration, login, membership, checkout requests, operator replies, and 
     button.click();
     await waitForButton();
     assert.equal((await fixture.db.query(`SELECT id FROM ${fixture.db.tables.payment_requests} WHERE method='gift-card'`)).rowCount, 1);
-    assert.equal((await request('/api/portal')).status, 402, 'Payment instructions do not activate membership');
+    assert.equal((await (await request('/api/portal')).json()).access.paid, false, 'Payment instructions do not activate membership');
+    assert.equal((await request('/api/portal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'message', message: 'Chat remains available without payment.' }) })).status, 200);
+    portal.destroy();
     assert.equal((await logout()).status, 200);
     assert.equal((await request('/api/payment-requests')).status, 401);
   } finally {

@@ -6,7 +6,7 @@ import { createTestDatabase } from './helpers.mjs';
 import { initPortal } from '../js/portal.js';
 import { seal, unseal } from '../portal.mjs';
 
-test('private portal enforces roles, ownership, expiry, quotas, booking consent and private content access', async () => {
+test('private portal preserves free chat while enforcing paid features, ownership, consent and private content access', async () => {
   const fixture = await createTestDatabase();
   let server;
   const doms = [];
@@ -23,10 +23,11 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
       assert.equal(result.status, 200, JSON.stringify(data)); return data;
     }
     async function register(name) {
-      const response = await post({ name, email: `${name}@example.test`, password: 'portal-test-password-123', adultConfirmed: true, planId: 'supporter', role: 'admin', tier: 'chosen' }, null, '/api/register');
+      const response = await post({ name, email: `${name}@example.test`, password: 'portal-test-password-123', adultConfirmed: true, role: 'admin', tier: 'chosen' }, null, '/api/register');
       assert.equal(response.status, 201);
       const { user } = await response.json();
       assert.equal(user.role, 'member'); assert.equal(user.tier, 'observer');
+      assert.equal(user.selectedPlan, null);
       return { ...user, cookie: response.headers.get('set-cookie').split(';')[0] };
     }
     assert.equal((await post({ name: 'young', email: 'no@example.test', password: 'portal-test-password-123' }, null, '/api/register')).status, 400);
@@ -36,23 +37,39 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
     await fixture.db.query(`UPDATE ${t.users} SET role='admin' WHERE id=$1`, [mistress.id]);
     assert.equal((await get('/admin.html', member.cookie)).status, 403);
     assert.equal((await get('/admin', mistress.cookie)).status, 200);
-    assert.equal((await get('/api/portal', member.cookie)).status, 402);
-    for (const action of ['profile', 'book', 'message', 'accept-reschedule', 'member']) {
+    const inactive = await (await get('/api/portal', member.cookie)).json();
+    assert.equal(inactive.access.paid, false);
+    for (const field of ['availability', 'bookings', 'content', 'publishedSessions', 'membershipPayments']) assert.deepEqual(inactive[field], []);
+    assert.deepEqual(inactive.profile, {});
+    assert.equal((await get('/dashboard.html', member.cookie)).status, 200);
+    assert.equal((await get('/checkout.html')).status, 302);
+    assert.equal((await get('/checkout.html', member.cookie)).status, 200);
+    for (const action of ['profile', 'book', 'accept-reschedule', 'member', 'content', 'membership-payment', 'cancel', 'payment-reply']) {
       assert.equal((await post({ action }, member.cookie)).status, 402);
     }
+    await success({ action: 'message', message: 'A conversation before payment', userId: stranger.id }, member.cookie);
+    assert.equal((await (await get('/api/portal/messages', member.cookie)).json()).messages.length, 1);
+    assert.equal((await (await get('/api/portal/messages', stranger.cookie)).json()).messages.length, 0);
+    assert.equal((await post({ action: 'select-plan', planId: 'chosen' }, member.cookie)).status, 400);
+    const selected = await success({ action: 'select-plan', planId: 'inner-circle', userId: stranger.id, tier: 'chosen', role: 'admin' }, member.cookie);
+    assert.equal(selected.selectedPlan, 'inner-circle');
+    const selectedUser = (await fixture.db.query(`SELECT tier,selected_plan FROM ${t.users} WHERE id=$1`, [member.id])).rows[0];
+    assert.equal(selectedUser.selected_plan, 'inner-circle'); assert.equal(selectedUser.tier, 'observer');
+    assert.equal((await fixture.db.query(`SELECT selected_plan FROM ${t.users} WHERE id=$1`, [stranger.id])).rows[0].selected_plan, null);
+    assert.equal((await post({ action: 'profile', adultConfirmed: true }, member.cookie)).status, 402, 'Selecting a plan does not activate paid features');
     await success({ action: 'member', userId: member.id, tier: 'supporter', until: new Date(Date.now() + 86400000 * 30).toISOString() }, mistress.cookie);
     await success({ action: 'profile', name: 'Member Alias', adultConfirmed: true, planId: 'supporter', boundaries: 'Private boundary text', preferences: 'Quiet setting', timezone: 'America/Denver' }, member.cookie);
     const encrypted = (await fixture.db.query(`SELECT details FROM ${t.profiles} WHERE user_id=$1`, [member.id])).rows[0].details;
     assert.ok(!encrypted.includes('Private boundary')); assert.equal(unseal(encrypted).boundaries, 'Private boundary text');
     const sealed = seal('secret'); assert.equal(unseal(sealed), 'secret');
     const modified = sealed.split('.'); modified[1] = Buffer.alloc(16).toString('base64'); assert.throws(() => unseal(modified.join('.')));
-    let other; assert.equal((await get('/api/portal', stranger.cookie)).status, 402);
+    let other; assert.equal((await (await get('/api/portal', stranger.cookie)).json()).access.paid, false);
     await success({ action: 'member', userId: member.id, tier: 'supporter', until: new Date(Date.now() + 86400000 * 30).toISOString() }, mistress.cookie);
     const startsAt = new Date(Date.now() + 86400000 * 3).toISOString();
     await success({ action: 'availability', format: 'in-person', startsAt, duration: 60, area: 'Denver', minRank: 1 }, mistress.cookie);
     assert.equal((await post({ action: 'availability', format: 'video', startsAt, duration: 30, area: '', minRank: 1 }, mistress.cookie)).status, 409);
     let portal = await (await get('/api/portal', member.cookie)).json(); const slotId = portal.availability[0].id;
-    assert.equal((await get('/api/portal', stranger.cookie)).status, 402);
+    assert.deepEqual((await (await get('/api/portal', stranger.cookie)).json()).availability, []);
     assert.equal((await post({ action: 'book', slotId, notes: '', consent: true, screening: true }, stranger.cookie)).status, 402);
     await success({ action: 'member', userId: stranger.id, tier: 'supporter', until: new Date(Date.now() + 86400000 * 30).toISOString() }, mistress.cookie);
     other = await (await get('/api/portal', stranger.cookie)).json();
@@ -83,7 +100,8 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
     await success({ action: 'cancel', id }, member.cookie);
     assert.equal((await post({ ...session, status: 'confirmed', screened: true }, mistress.cookie)).status, 409);
     for (let i = 0; i < 5; i++) await success({ action: 'message', message: `<b>Private ${i}</b>` }, member.cookie);
-    assert.equal((await post({ action: 'message', message: 'Over quota' }, member.cookie)).status, 403);
+    await success({ action: 'message', message: 'Chat continues beyond the former quota' }, member.cookie);
+    assert.equal((await (await get('/api/portal/messages', member.cookie)).json()).messageAllowance.unlimited, true);
     other = await (await get('/api/portal', stranger.cookie)).json(); assert.equal(other.messages.length, 0);
     await success({ action: 'message', userId: member.id, message: 'Reply from Mistress' }, mistress.cookie);
     assert.equal((await (await get('/api/portal/notifications', member.cookie)).json()).unreadMessages, 1);
@@ -122,10 +140,16 @@ test('private portal enforces roles, ownership, expiry, quotas, booking consent 
       const ids = [...dom.window.document.querySelectorAll('[id]')].map(n => n.id); assert.equal(new Set(ids).size, ids.length);
     }
     await fixture.db.query(`UPDATE ${t.users} SET membership_until=now()-interval '1 day' WHERE id=$1`, [member.id]);
-    assert.equal((await get('/api/portal', member.cookie)).status, 402);
-    assert.equal((await get('/api/portal/notifications', member.cookie)).status, 402);
-    assert.equal((await post({ action: 'messages-read', ids: [replyId] }, member.cookie)).status, 402);
-    assert.equal((await get('/dashboard.html', member.cookie)).status, 302);
+    const expired = await (await get('/api/portal', member.cookie)).json();
+    assert.equal(expired.access.paid, false);
+    assert.deepEqual(expired.profile, {});
+    for (const field of ['availability', 'bookings', 'content', 'publishedSessions', 'membershipPayments']) assert.deepEqual(expired[field], []);
+    assert.ok(expired.messages.length > 0, 'Conversation history survives membership expiry');
+    assert.equal((await get('/api/portal/notifications', member.cookie)).status, 200);
+    assert.equal((await post({ action: 'messages-read', ids: [replyId] }, member.cookie)).status, 200);
+    assert.equal((await get('/dashboard.html', member.cookie)).status, 200);
+    await success({ action: 'message', message: 'I can still chat after my membership expires.' }, member.cookie);
+    assert.equal((await post({ action: 'profile', name: 'Blocked change', adultConfirmed: true }, member.cookie)).status, 402);
     assert.equal((await get(`/api/portal/content-file?id=${contentId}`, member.cookie)).status, 402);
     await success({ action: 'member', userId: member.id, tier: 'observer', suspended: true }, mistress.cookie);
     assert.equal((await get('/api/portal', member.cookie)).status, 401);

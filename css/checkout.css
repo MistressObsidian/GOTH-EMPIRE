@@ -115,3 +115,4 @@
 @media (max-width: 740px) { .checkout-main { width: calc(100% - 40px); margin-top: 36px; } .checkout-intro { margin-bottom: 32px; } .checkout-layout { grid-template-columns: 1fr; gap: 28px; } .order-card { position: static; } .checkout-back { font-size: 11px; } .checkout-header { padding-inline: 20px; } .checkout-header .brand { width: 120px; } .plan-option { padding-right: 16px; } .account-card { flex-wrap: wrap; } .checkout-footer { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .checkout-page *, .checkout-page *::before { transition: none; scroll-behavior: auto; } }
 @media (max-width: 480px) { .payment-methods { grid-template-columns: 1fr; } .payment-option-card { flex-direction: row; align-items: center; padding-right: 46px; } .payment-panel { padding: 18px; } }
+.checkout-page .checkout-plans { grid-template-columns: 1fr; }

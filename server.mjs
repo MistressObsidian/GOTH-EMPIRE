@@ -35,7 +35,7 @@ export function createRequestHandler(db, { config = readRuntimeConfig(), payment
     try {
       const url = new URL(req.url, 'http://localhost');
       const token = /(?:^|;\s*)session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1];
-      const needsAccount = url.pathname.startsWith('/api/') || ['/dashboard.html', '/admin.html', '/admin'].includes(url.pathname);
+      const needsAccount = url.pathname.startsWith('/api/') || ['/dashboard.html', '/dashboard', '/admin.html', '/admin', '/checkout.html', '/checkout'].includes(url.pathname);
       const user = token && needsAccount && (await db.query(`SELECT u.* FROM ${t.users} u JOIN ${t.sessions} s ON u.id=s.user_id WHERE s.token=$1 AND s.expires>$2`, [digest(token), Date.now()])).rows[0];
       if (url.pathname.startsWith('/api/')) {
         if (user?.suspended && url.pathname !== '/api/logout') return send(403, { error: 'Your account is suspended. Contact the Mistress to discuss access.' });
@@ -102,7 +102,7 @@ export function createRequestHandler(db, { config = readRuntimeConfig(), payment
         let account;
         if (url.pathname === '/api/register') {
           if (body.adultConfirmed !== true) return send(400, { error: 'Registration is for adults 18 or older. Confirm your eligibility.' });
-          if (!plans.some(plan => plan.id === body.planId)) return send(400, { error: 'Select a paid membership plan to register.' });
+          if (body.planId != null && body.planId !== '' && !plans.some(plan => plan.id === body.planId)) return send(400, { error: 'Choose a valid membership plan.' });
           const name = typeof body.name === 'string' ? body.name.trim() : '';
           if (!name || name.length > 80 || password.length < 12) return send(400, { error: 'Enter your name and a password of 12–128 characters.' });
           const profile = {};
@@ -113,10 +113,10 @@ export function createRequestHandler(db, { config = readRuntimeConfig(), payment
           if ((await db.query(`SELECT id FROM ${t.users} WHERE email=$1`, [email])).rowCount) return send(409, { error: 'An account with this email already exists. Please log in.' });
           const salt = randomBytes(16).toString('hex');
           const hash = (await derive(password, salt, 64)).toString('hex');
-          account = { id: randomUUID(), name, email, role: 'member', tier: 'observer', selected_plan: body.planId, adult_confirmed: true };
+          account = { id: randomUUID(), name, email, role: 'member', tier: 'observer', selected_plan: body.planId || null, adult_confirmed: true };
           try {
             await db.transaction(async client => {
-              await client.query(`INSERT INTO ${t.users} (id,name,email,salt,hash,adult_confirmed,selected_plan) VALUES ($1,$2,$3,$4,$5,true,$6)`, [account.id, name, email, salt, hash, body.planId]);
+              await client.query(`INSERT INTO ${t.users} (id,name,email,salt,hash,adult_confirmed,selected_plan) VALUES ($1,$2,$3,$4,$5,true,$6)`, [account.id, name, email, salt, hash, account.selected_plan]);
               if (Object.values(profile).some(Boolean)) await client.query(`INSERT INTO ${t.profiles}(user_id,details) VALUES($1,$2)`, [account.id, seal(profile)]);
             });
           }
@@ -140,13 +140,12 @@ export function createRequestHandler(db, { config = readRuntimeConfig(), payment
       let path = decodeURIComponent(url.pathname);
       if (path === '/') path = '/index.html';
       if (path === '/admin') path = '/admin.html';
-      if (['/dashboard.html', '/admin.html'].includes(path) && (!user || user.suspended)) {
+      if (path === '/dashboard') path = '/dashboard.html';
+      if (path === '/checkout') path = '/checkout.html';
+      if (['/dashboard.html', '/admin.html', '/checkout.html'].includes(path) && (!user || user.suspended)) {
         res.writeHead(302, { Location: '/login.html' }); return res.end();
       }
       if (path === '/admin.html' && user.role !== 'admin') return send(403, { error: 'Mistress access required.' });
-      if (path === '/dashboard.html' && user.role !== 'admin' && safeMember(user).tier === 'observer') {
-        res.writeHead(302, { Location: '/checkout.html' + (user.selected_plan ? '?plan=' + encodeURIComponent(user.selected_plan) : '') }); return res.end();
-      }
       if (!/^\/(index|login|register|dashboard|checkout|admin)\.html$/.test(path) && !/^\/(css|js|images|videos)\/[a-zA-Z0-9_./-]+$/.test(path)) return send(404, { error: 'Not found.' });
       if (path.split('/').some(segment => segment.startsWith('.'))) return send(404, { error: 'Not found.' });
       const content = await readPublicFile(path);

@@ -32,14 +32,16 @@ export function initCheckout(options = {}) {
   }]));
   const currentPlan = () => fieldset.querySelector('input:checked')?.value;
   const currentMethod = () => paymentMethods.querySelector('input:checked').value;
-  for (const plan of plans) {
+  function renderSelectedPlan(id) {
+  fieldset.replaceChildren();
+  for (const plan of plans.filter(plan => plan.id === id)) {
     const label = document.createElement('label');
     label.className = 'checkout-plan';
     const radio = document.createElement('input');
     radio.type = 'radio';
     radio.name = 'plan';
     radio.value = plan.id;
-    radio.checked = selected === plan.id;
+    radio.checked = true;
     radio.setAttribute('aria-label', `${plan.name}, ${formatPrice(plan.price)} per month`);
     const card = document.createElement('span');
     card.className = 'plan-option';
@@ -70,6 +72,8 @@ export function initCheckout(options = {}) {
     label.append(radio, card);
     fieldset.append(label);
   }
+  }
+  renderSelectedPlan(selected);
   function updateSummary() {
     const value = fieldset.querySelector('input:checked')?.value;
     const plan = plans.find(plan => plan.id === value);
@@ -231,12 +235,13 @@ export function initCheckout(options = {}) {
       signedIn = true;
       member = user;
       if (!currentPlan() && plans.some(plan => plan.id === user.selectedPlan)) {
-        for (const radio of fieldset.querySelectorAll('input')) radio.checked = radio.value === user.selectedPlan;
+        renderSelectedPlan(user.selectedPlan);
         updateSummary();
       }
+      if (!currentPlan()) { navigate('dashboard.html#membership'); return; }
       document.querySelector('#account-label').textContent = user.name;
       document.querySelector('#account-badge').hidden = false;
-      status.textContent = user.email + (user.tier === 'observer' ? ' · Complete payment and await membership activation to access your portal.' : '');
+      status.textContent = user.email + (user.tier === 'observer' ? ' · Other features unlock after membership activation. Private chat remains available.' : '');
       try { await readRequests(); restoreOtherMethod(); } catch (error) { requestError = error instanceof TypeError ? 'Unable to load saved requests. Please try again.' : error.message; }
     } catch {
       accountUnavailable = true;

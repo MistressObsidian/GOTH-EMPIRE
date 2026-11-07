@@ -112,6 +112,14 @@ summary { color: var(--gold); cursor: pointer; }
 .member-menu nav { display: grid; gap: 4px; margin-bottom: 20px; }
 .member-menu nav a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 6px; color: #e2d8d3; }
 .member-menu nav a:hover, .member-menu nav a[aria-current=page] { color: var(--gold); background: #34212b; text-decoration: none; }
+.nav-lock { color: var(--muted); font-size: 10px; text-align: right; line-height: 1.4; max-width: 75px; }
+.membership-plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; margin-top: 24px; }
+.membership-plan { display: flex; flex-direction: column; gap: 12px; margin: 0; background: #100c0fe6; }
+.membership-plan > * { margin-block: 0; }
+.membership-plan .stat { font-size: 23px; }
+.membership-plan ul { padding-left: 20px; color: var(--muted); }
+.membership-plan button { margin-top: auto; }
+[data-locked=true] .portal-button + .portal-button, .next-appointment .portal-button + .portal-button { margin-left: 8px; }
 .member-menu > a { font-size: 12px; }
 .member-menu #logout-btn { display: block; width: 100%; margin-top: 18px; }
 .member-breadcrumb { margin: 0; }

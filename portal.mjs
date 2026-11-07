@@ -1,5 +1,5 @@
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
-import { tierFor, tiers } from './js/membership.js';
+import { plans, tierFor, tiers } from './js/membership.js';
 import { replyToPaymentRequest } from './payment-requests.mjs';
 
 function key() {
@@ -22,7 +22,7 @@ const fail = (message, status = 400) => { throw Object.assign(new Error(message)
 const text = (value, max = 2000) => typeof value === 'string' && value.length <= max ? value.trim() : fail(`Enter text of no more than ${max} characters.`);
 export function memberTier(user) {
   const tier = user.tier !== 'observer' && (!user.membership_until || new Date(user.membership_until) <= new Date()) ? tierFor('observer') : tierFor(user.tier);
-  return tier.id === 'chosen' ? { ...tier, messages: user.custom_message_limit ?? 30 } : tier;
+  return tier;
 }
 export const safeMember = user => ({ id: user.id, name: user.name, email: user.email, role: user.role || 'member', tier: memberTier(user).id, membershipUntil: user.membership_until, selectedPlan: user.selected_plan, adultConfirmed: user.adult_confirmed === true, suspended: user.suspended === true, customMessageLimit: user.custom_message_limit });
 
@@ -35,7 +35,8 @@ async function messageState(db, user, admin, tier) {
   const month = new Date().toISOString().slice(0, 7);
   const used = messages.filter(message => message.sender === 'member' && message.user_id === user.id && new Date(message.created_at).toISOString().slice(0, 7) === month).length;
   return {
-    messages, messageAllowance: { limit: tier.messages, used },
+    user: safeMember(user), tier, access: { paid: admin || tier.rank > 0 },
+    messages, messageAllowance: { limit: null, used, unlimited: true },
     unreadMessages: messages.filter(message => message.user_id === user.id && message.sender === 'mistress' && !message.member_read_at).length,
     responseWindow: 'Allow up to 2 business days for a reply. Messaging is not an emergency service.'
   };
@@ -47,9 +48,12 @@ export async function portalGet(db, user, url) {
   const t = db.tables;
   const admin = user.role === 'admin';
   const tier = memberTier(user);
-  if (!admin && tier.rank < 1) fail('Choose a paid plan and complete payment. Portal access opens after membership activation.', 402);
-  if (url.pathname === '/api/portal/notifications') return { unreadMessages: await unreadMessages(db, user.id) };
+  if (url.pathname === '/api/portal/notifications') return { unreadMessages: await unreadMessages(db, user.id), access: { paid: admin || tier.rank > 0 } };
   if (url.pathname === '/api/portal/messages') return messageState(db, user, admin, tier);
+  if (!admin && tier.rank < 1) {
+    if (url.pathname !== '/api/portal') fail('Activate a membership to unlock this feature. Private chat is available without payment.', 402);
+    return { user: safeMember(user), tier, access: { paid: false }, profile: {}, availability: [], bookings: [], content: [], publishedSessions: [], membershipPayments: [], ...await messageState(db, user, false, tier) };
+  }
   if (url.pathname === '/api/portal/content-file') {
     const row = (await db.query(`SELECT * FROM ${t.content} WHERE id=$1`, [url.searchParams.get('id')])).rows[0];
     if (!row || (!admin && row.min_rank > tier.rank)) fail('Content not available.', 404);
@@ -73,7 +77,7 @@ export async function portalGet(db, user, url) {
     const body = unseal(row.body);
     return { ...row, body: body.text, fileName: body.file?.name };
   });
-  const result = { user: safeMember(user), tier, profile: profile ? unseal(profile.details) : {}, availability, bookings, content, ...conversation };
+  const result = { user: safeMember(user), tier, access: { paid: true }, profile: profile ? unseal(profile.details) : {}, availability, bookings, content, ...conversation };
   result.publishedSessions = (await db.query(`SELECT a.id,a.format,a.starts_at,a.duration,a.area,a.min_rank FROM ${t.availability} a WHERE a.enabled AND a.starts_at>now() AND NOT EXISTS(SELECT 1 FROM ${t.bookings} b WHERE b.slot_id=a.id AND b.status='confirmed') ORDER BY a.starts_at`)).rows;
   result.membershipPayments = (await db.query(`SELECT * FROM ${t.membership_payments} WHERE ($1 OR user_id=$2) ORDER BY created_at DESC`, [admin, user.id])).rows.map(row => ({ ...row, reference: unseal(row.reference) }));
   if (admin) {
@@ -91,10 +95,15 @@ export async function portalPost(db, user, body) {
   const t = db.tables;
   const admin = user.role === 'admin';
   const tier = memberTier(user);
-  if (!admin && tier.rank < 1) fail('Choose a paid plan and complete payment. Portal access opens after membership activation.', 402);
+  if (!admin && tier.rank < 1 && !['message', 'messages-read', 'select-plan'].includes(body.action)) fail('Activate a membership to unlock this feature. Private chat is available without payment.', 402);
   const requireAdmin = () => { if (!admin) fail('Mistress access required.', 403); };
   const requireAdult = () => { if (!user.adult_confirmed) fail('Confirm adult eligibility in My Profile first.', 403); };
   switch (body.action) {
+    case 'select-plan': {
+      if (!plans.some(plan => plan.id === body.planId)) fail('Choose a valid membership plan.');
+      await db.query(`UPDATE ${t.users} SET selected_plan=$1 WHERE id=$2`, [body.planId, user.id]);
+      return { success: true, selectedPlan: body.planId };
+    }
     case 'messages-read': {
       if (admin) fail('Only the receiving member can mark these messages as read.', 403);
       if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > 200 || body.ids.some(id => typeof id !== 'string' || !id.length || id.length > 80)) fail('Choose up to 200 displayed messages.');
@@ -141,17 +150,15 @@ export async function portalPost(db, user, body) {
       break;
     }
     case 'message': {
-      requireAdult();
+      if (admin) requireAdult();
+      else if (!user.adult_confirmed && body.adultConfirmed !== true) fail('Confirm that you are 18 or older before sending a private message.', 403);
       const message = text(body.message);
       if (!message) fail('Enter a message.');
       const target = admin ? text(body.userId, 80) : user.id;
       await db.transaction(async client => {
         const owner = (await client.query(`SELECT * FROM ${t.users} WHERE id=$1 FOR UPDATE`, [target])).rows[0];
         if (!owner) fail('Member not found.', 404);
-        if (!admin) {
-          const count = Number((await client.query(`SELECT count(*) AS count FROM ${t.messages} WHERE user_id=$1 AND sender='member' AND created_at>=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, [user.id])).rows[0].count);
-          if (count >= tier.messages) fail('Your monthly messaging allowance is used. Membership upgrades are available in My Membership.', 403);
-        }
+        if (!admin && !owner.adult_confirmed) await client.query(`UPDATE ${t.users} SET adult_confirmed=true WHERE id=$1`, [user.id]);
         await client.query(`INSERT INTO ${t.messages}(id,user_id,sender,body) VALUES($1,$2,$3,$4)`, [randomUUID(), target, admin ? 'mistress' : 'member', seal(message)]);
       });
       break;

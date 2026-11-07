@@ -17,7 +17,7 @@ test('registration, validation, sessions, login, logout, and persistence', async
   const post = (route, body, cookie, origin) => fetch(base + route, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body)
   });
-  const credentials = { adultConfirmed: true, planId: 'supporter', name: 'Test Member', email: 'member@example.test', password: 'long-test-password-123', bio: 'A private introduction', fantasies: 'Interests to discuss', boundaries: 'My personal limits' };
+  const credentials = { adultConfirmed: true, name: 'Test Member', email: 'member@example.test', password: 'long-test-password-123', bio: 'A private introduction', fantasies: 'Interests to discuss', boundaries: 'My personal limits' };
   try {
     await start();
     assert.equal((await fetch(base + '/api/me')).status, 401);
@@ -31,6 +31,8 @@ test('registration, validation, sessions, login, logout, and persistence', async
     let cookie = registration.headers.get('set-cookie').split(';')[0];
     const result = await registration.json();
     assert.equal(result.user.name, credentials.name);
+    assert.equal(result.user.selectedPlan, null);
+    assert.equal(result.user.tier, 'observer');
     assert.equal(result.user.hash, undefined);
     assert.equal(result.user.bio, undefined);
     const profile = (await fixture.db.query(`SELECT details FROM ${fixture.db.tables.profiles} WHERE user_id=$1`, [result.user.id])).rows[0];
@@ -39,7 +41,7 @@ test('registration, validation, sessions, login, logout, and persistence', async
     assert.equal(unseal(profile.details).fantasies, credentials.fantasies);
     assert.equal(unseal(profile.details).boundaries, credentials.boundaries);
     assert.equal((await fetch(base + '/api/me', { headers: { Cookie: cookie } })).status, 200);
-    assert.equal((await fetch(base + '/dashboard.html', { headers: { Cookie: cookie }, redirect: 'manual' })).status, 302);
+    assert.equal((await fetch(base + '/dashboard.html', { headers: { Cookie: cookie }, redirect: 'manual' })).status, 200);
     assert.equal((await post('/api/register', { ...credentials, email: 'MEMBER@example.test' })).status, 409);
     assert.equal((await post('/api/login', { ...credentials, password: 'wrong-password' })).status, 401);
     for (const secret of ['/data/accounts.sqlite', '/server.mjs', '/images/../data/accounts.sqlite', '/package.json', '/.env', '/.env.example', '/database.mjs', '/env.mjs', '/node_modules/pg/package.json']) assert.equal((await fetch(base + secret)).status, 404);

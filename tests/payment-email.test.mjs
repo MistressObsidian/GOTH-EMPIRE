@@ -92,7 +92,7 @@ test('submissions email Mistress automatically, deduplicate, survive failures, a
     for (const request of list.requests) {
       assert.equal(request.notification_key, undefined); assert.equal(request.email_payload, undefined); assert.equal(request.email_provider_id, undefined);
     }
-    assert.equal((await fetch(base + '/api/portal', { headers: { Cookie: cookie } })).status, 402);
+    assert.equal((await (await fetch(base + '/api/portal', { headers: { Cookie: cookie } })).json()).access.paid, false);
     const pending = await savePaymentRequest(fixture.db, member.id, { planId: 'elite', method: 'ask' });
     assert.equal(await emailPaymentRequest(fixture.db, member, pending.request, pending.notificationKey, null), 'not_configured');
     assert.equal(await emailPaymentRequest(fixture.db, member, pending.request, pending.notificationKey, sender), 'accepted');

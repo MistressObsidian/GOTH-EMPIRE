@@ -1,4 +1,4 @@
-import { tiers, tierFor, formatPrice } from './membership.js';
+import { plans, tiers, tierFor, formatPrice } from './membership.js';
 import { paymentPreference, paymentReplyEmail, paymentEmailStatusMessage } from './payment-contact.js';
 import { initMemberNavigation } from './member-navigation.js';
 
@@ -32,6 +32,13 @@ export function initPortal(options = {}) {
     if (description) node.append(el('p', description, 'muted'));
     root.append(node); return node;
   };
+  const hasPaidAccess = () => data.user.role === 'admin' || data.tier.rank > 0;
+  function lockedSection(id, title) {
+    const area = section(id, title);
+    area.dataset.locked = 'true';
+    area.append(el('p', 'Activate a membership to unlock this feature. Your private chat with the Mistress is always available without payment.'), link('View membership plans', '#membership'), link('Open private chat', '#messages'));
+    return area;
+  }
   const field = (form, name, caption, type = 'text', value = '', choices) => {
     const label = el('label'); label.append(el('span', caption));
     const input = el(type === 'textarea' ? 'textarea' : choices ? 'select' : 'input');
@@ -51,7 +58,7 @@ export function initPortal(options = {}) {
   function report(message) { status.textContent = message; status.scrollIntoView?.({ block: 'nearest' }); }
   async function save(payload) {
     const response = await request('/api/portal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (response.status === 402) { window.location.replace('checkout.html'); return; }
+    if (response.status === 402) { await load(); navigation?.select('membership'); report('Activate a membership to unlock this feature. Private chat remains available.'); return; }
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Unable to save. Please try again.');
     await load(); report(payload.action === 'book' ? 'Request submitted—awaiting Mistress approval. Your appointment is not yet confirmed.' : payload.action === 'payment-reply' ? 'Reply saved in the member’s checkout. Use Email this reply to send it from your email app.' : 'Saved. Your private space is up to date.');
@@ -91,13 +98,22 @@ export function initPortal(options = {}) {
     document.querySelector('#account-name').textContent = data.user.name;
     document.querySelector('#account-email').textContent = data.user.email || '';
     document.querySelector('#member-initials').textContent = data.user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
-    document.querySelector('#member-expiry').textContent = data.user.tier === 'observer' ? 'Payment pending / inactive' : `Membership expires ${when(data.user.membershipUntil)}`;
+    document.querySelector('#member-expiry').textContent = data.user.tier === 'observer' ? 'Private chat available · Membership not activated' : `Membership expires ${when(data.user.membershipUntil)}`;
+    document.querySelector('.dashboard-bio').hidden = !hasPaidAccess();
+    document.querySelector('.member-summary .portal-button').hidden = !hasPaidAccess();
     const biography = document.querySelector('#member-bio-copy');
     biography.replaceChildren();
     for (const [label, value] of [['Bio', data.profile.bio], ['Interests and fantasies', data.profile.fantasies], ['Limits and boundaries', data.profile.boundaries]]) {
       biography.append(el('strong', label), el('p', value || 'Not added yet. You can update this in My Profile.'));
     }
     overview.replaceChildren();
+    if (!hasPaidAccess()) {
+      const welcome = el('section', undefined, 'record next-appointment');
+      welcome.append(el('h3', 'Your account is ready'), el('p', 'Start a private conversation with the Mistress at any time. Choose and activate a membership when you are ready to unlock the other dashboard features.'), link('Chat with the Mistress', '#messages'), link('Choose a membership', '#membership'));
+      overview.append(welcome);
+      overview.setAttribute('aria-busy', 'false');
+      return;
+    }
     const upcoming = data.bookings.filter(item => item.status === 'confirmed' && new Date(item.starts_at) > new Date()).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
     const pending = data.bookings.filter(item => ['requested', 'rescheduled'].includes(item.status));
     const stats = el('div', undefined, 'overview-stats');
@@ -118,7 +134,7 @@ export function initPortal(options = {}) {
     else next.append(el('h3', 'Your calendar is clear'), el('p', 'You have no upcoming confirmed appointments.', 'muted'), link('Explore appointment windows', '#book'));
     overview.append(next);
     const published = el('section', undefined, 'record published-sessions');
-    published.append(el('h3', 'Sessions published by the Mistress'), el('p', 'Visible to every registered member. A published window is not a confirmed booking.', 'muted'));
+    published.append(el('h3', 'Sessions published by the Mistress'), el('p', 'Available with an active membership. A published window is not a confirmed booking.', 'muted'));
     const sessions = data.publishedSessions || data.availability;
     if (!sessions.length) published.append(el('p', 'No upcoming sessions have been published yet.', 'empty'));
     for (const slot of sessions) {
@@ -133,6 +149,7 @@ export function initPortal(options = {}) {
     overview.setAttribute('aria-busy', 'false');
   }
   function renderProfile() {
+    if (!hasPaidAccess()) { lockedSection('profile', 'My Profile'); return; }
     const area = section('profile', 'My Profile', 'Your display name, preferences and boundaries are visible only to you and the Mistress. Update them whenever your wishes change.');
     const f = form(area, 'profile', 'Save my profile');
     field(f.node, 'name', 'Display name', 'text', data.user.name).required = true;
@@ -146,8 +163,25 @@ export function initPortal(options = {}) {
   }
   function renderMember() {
     const membership = section('membership', 'My Membership');
-    membership.append(el('span', data.tier.name, 'badge'), el('p', data.user.tier === 'observer' ? 'Payment and membership activation are required. Complete checkout to request paid access.' : `Active until ${when(data.user.membershipUntil)}. Session fees are separate.`));
-    membership.append(link(data.tier.rank ? 'Explore membership options' : 'Continue to payment', data.tier.rank ? 'index.html#membership' : 'checkout.html' + (data.user.selectedPlan ? '?plan=' + encodeURIComponent(data.user.selectedPlan) : '')));
+    membership.append(el('span', data.tier.name, 'badge'), el('p', data.user.tier === 'observer' ? 'Choose a plan to unlock your profile, bookings, records and exclusive content after payment and membership activation.' : `Active until ${when(data.user.membershipUntil)}. Session fees are separate.`), el('p', 'Private chat is available with or without a membership, without a membership-based message limit.', 'muted'));
+    const catalog = el('div', undefined, 'membership-plan-grid');
+    for (const plan of plans) {
+      const card = el('article', undefined, 'record membership-plan'); card.dataset.planId = plan.id;
+      card.append(el('h3', plan.name), el('p', `${formatPrice(plan.price)} / month`, 'stat'), el('p', plan.description));
+      const benefits = el('ul'); for (const benefit of plan.benefits) benefits.append(el('li', benefit)); card.append(benefits);
+      if (data.user.selectedPlan === plan.id) card.append(el('p', data.user.tier === plan.id ? 'Current membership' : 'Selected · Awaiting activation', 'badge'));
+      button(card, `Choose ${plan.name}`, async () => {
+        const response = await request('/api/portal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'select-plan', planId: plan.id }) });
+        if (disposed || sessionEnded(response)) return;
+        const result = await response.json();
+        if (!response.ok || result.success !== true || result.selectedPlan !== plan.id) throw new Error(result.error || 'Unable to save your plan. Please try again.');
+        navigate(`checkout.html?plan=${encodeURIComponent(plan.id)}`);
+      });
+      catalog.append(card);
+    }
+    membership.append(catalog);
+    const invitation = el('article', undefined, 'record'); invitation.append(el('h3', 'The Chosen One'), el('p', 'A personal arrangement, by invitation from the Mistress.'), link('Discuss a private arrangement', '#messages')); membership.append(invitation);
+    if (!hasPaidAccess()) { lockedSection('book', 'Book a Session'); return; }
     const booking = section('book', 'Book a Session', 'Choose an online or in-person window. Times are shown in your device’s time zone. Requests are subject to screening, consent, availability and the Mistress’s approval. Session fees are agreed separately before confirmation.');
     if (!data.tier.rank) booking.append(el('p', 'Complete payment and membership activation before requesting an appointment.', 'empty'));
     else {
@@ -186,6 +220,7 @@ export function initPortal(options = {}) {
     }
   }
   function renderSessions(admin) {
+    if (!admin && !hasPaidAccess()) { lockedSection('sessions', 'Session Records'); return; }
     const area = section('sessions', 'Session Records', admin ? 'Review requests, screening, agreed fees and consent before confirming. Rescheduling requires the member to accept again.' : 'Your requests and session history. Meeting links and exact locations appear only after confirmation.');
     if (!data.bookings.length) area.append(el('p', 'No session records yet.', 'empty'));
     for (const session of data.bookings) {
@@ -230,18 +265,20 @@ export function initPortal(options = {}) {
   function renderMessages(admin) {
     const area = section('messages', admin ? 'Private Conversations' : 'Private Messages', data.responseWindow);
     if (!admin) {
-      area.append(el('p', `${data.messageAllowance.used} of ${data.messageAllowance.limit} messages used this calendar month (UTC).`, 'message-allowance'));
+      area.append(el('p', 'Private chat is always available, with or without a paid membership.', 'message-allowance'));
       button(area, 'Refresh messages', refreshMessages, true);
     }
     area.append(el('div', undefined, 'message-list'));
     renderMessageList(area, admin);
     if (admin && !data.members.filter(m => m.role !== 'admin').length) return;
-    if (!admin && data.messageAllowance.used >= data.messageAllowance.limit) { area.append(el('p', 'No messages available on your current allowance. You can still read your conversation history.')); return; }
     const f = form(area, 'message', 'Send private message');
     if (admin) field(f.node, 'userId', 'Recipient', 'text', '', data.members.filter(m => m.role !== 'admin').map(m => [m.id, m.name]));
-    field(f.node, 'message', 'Message', 'textarea').required = true; f.finish();
+    field(f.node, 'message', 'Message', 'textarea').required = true;
+    if (!admin && !data.user.adultConfirmed) field(f.node, 'adultConfirmed', 'I confirm that I am 18 or older.', 'checkbox').required = true;
+    f.finish();
   }
   function renderContent(admin) {
+    if (!admin && !hasPaidAccess()) { lockedSection('content', 'Exclusive Content'); return; }
     const area = section('content', 'Exclusive Content', 'Access follows your current membership. Private downloads require an active session.');
     if (admin) {
       const f = form(area, 'content', 'Publish content');
@@ -267,7 +304,6 @@ export function initPortal(options = {}) {
       const f = form(card, 'member', 'Update access', { userId: member.id });
       field(f.node, 'tier', 'Membership', 'text', member.tier, tierChoices);
       field(f.node, 'until', 'Paid access expires (UTC)', 'date', member.membershipUntil?.slice(0, 10));
-      const allowance = field(f.node, 'customMessageLimit', 'The Chosen One: agreed monthly message allowance', 'number', member.customMessageLimit ?? 30); allowance.min = '0'; allowance.max = '1000';
       field(f.node, 'suspended', 'Suspend this account', 'checkbox', member.suspended); f.finish(); members.append(card);
     }
     if (!data.members.some(m => m.role !== 'admin')) members.append(el('p', 'No submissives have registered yet.', 'empty'));
@@ -287,6 +323,7 @@ export function initPortal(options = {}) {
     }
   }
   function renderPayments(admin) {
+    if (!admin && !hasPaidAccess()) { lockedSection('payments', 'Payments'); return; }
     const area = section('payments', admin ? 'Payments & Revenue' : 'Payments', 'Membership fees and individual session fees are separate. Payment instructions are not a charge or confirmation of payment.');
     if (!admin) area.append(link('Request membership payment instructions', 'checkout.html'));
     for (const payment of data.membershipPayments) {
@@ -371,13 +408,13 @@ export function initPortal(options = {}) {
     if (note) note.textContent = '';
   }
   function sessionEnded(response) {
-    if (![401, 402, 403].includes(response.status)) return false;
+    if (![401, 403].includes(response.status)) return false;
     data = null;
     root.replaceChildren();
     const overview = document.querySelector('#overview');
     if (memberPage && overview) { overview.replaceChildren(); overview.hidden = true; }
     updateMessageCount(0);
-    navigate(response.status === 402 ? 'checkout.html' : 'login.html');
+    navigate('login.html');
     return true;
   }
   function acknowledgeMessages() {
@@ -416,11 +453,11 @@ export function initPortal(options = {}) {
         if (disposed || sessionEnded(response)) return;
         const result = await response.json();
         if (!response.ok || !Array.isArray(result.messages)) throw new Error('Unable to refresh messages.');
+        if (result.access && result.access.paid !== hasPaidAccess()) { await reloadAccess(); return; }
         data.messages = result.messages;
         data.messageAllowance = result.messageAllowance;
         data.unreadMessages = result.unreadMessages;
         renderMessageList(document.querySelector('#messages'), false);
-        document.querySelector('.message-allowance').textContent = `${data.messageAllowance.used} of ${data.messageAllowance.limit} messages used this calendar month (UTC).`;
         updateMessageCount(result.unreadMessages);
         await acknowledgeMessages();
       } finally { messageRefresh = null; }
@@ -438,6 +475,7 @@ export function initPortal(options = {}) {
         if (disposed || sessionEnded(response)) return;
         const result = await response.json();
         if (!response.ok) throw new Error('Unable to refresh notifications.');
+        if (result.access && result.access.paid !== hasPaidAccess()) { await reloadAccess(); return; }
         // A poll started before a read acknowledgment must not restore an old count.
         if (revision !== notificationRevision) return;
         data.unreadMessages = result.unreadMessages;
@@ -450,6 +488,17 @@ export function initPortal(options = {}) {
   document.querySelector('#review-payment-requests')?.addEventListener('click', async event => {
     event.preventDefault(); await load(); document.querySelector('#payment-requests')?.scrollIntoView?.({ block: 'start' });
   });
+  async function reloadAccess() {
+    const composer = document.querySelector('#messages textarea[name=message]');
+    const draft = composer?.value;
+    const focused = document.activeElement === composer;
+    await load();
+    const replacement = document.querySelector('#messages textarea[name=message]');
+    if (draft !== undefined && replacement) {
+      replacement.value = draft;
+      if (focused) replacement.focus({ preventScroll: true });
+    }
+  }
   async function load() {
     try {
       const response = await request('/api/portal');
@@ -458,12 +507,19 @@ export function initPortal(options = {}) {
       if (!response.ok) throw new Error(result.error || 'Unable to load your private space.');
       data = result;
       const admin = data.user.role === 'admin' && document.body.dataset.admin === 'true';
-      document.querySelector('#membership-status').textContent = admin ? 'Private administration · Goddess Ivy' : `${data.tier.name} · ${data.user.tier === 'observer' ? 'Awaiting activation' : 'Active membership'}`;
+      document.querySelector('#membership-status').textContent = admin ? 'Private administration · Goddess Ivy' : hasPaidAccess() ? `${data.tier.name} · Active membership` : 'Private chat available';
       root.replaceChildren();
       if (!admin) renderOverview();
       if (admin) { updatePaymentAlert(data.paymentRequests.filter(request => request.status === 'pending_instructions').length); renderPaymentRequests(); renderAdmin(); } else renderMember();
       renderSessions(admin); renderMessages(admin); renderContent(admin); renderPayments(admin); renderProfile();
-      if (memberPage) { navigation.refresh(); updateMessageCount(data.unreadMessages || 0); }
+      if (memberPage) {
+        for (const item of document.querySelectorAll('#member-menu nav a')) {
+          const locked = !hasPaidAccess() && ['profile', 'book', 'sessions', 'content', 'payments'].includes(item.hash.slice(1));
+          item.querySelector('.nav-lock')?.remove();
+          if (locked) { const badge = el('span', 'Membership required', 'nav-lock'); item.append(badge); }
+        }
+        navigation.refresh(); updateMessageCount(data.unreadMessages || 0);
+      }
       root.setAttribute('aria-busy', 'false');
       if (memberPage) await acknowledgeMessages();
     } catch (error) {

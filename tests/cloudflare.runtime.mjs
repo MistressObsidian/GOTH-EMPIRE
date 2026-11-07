@@ -26,8 +26,8 @@ test('Cloudflare packaging and request handling in the Workers runtime', { timeo
       }
       await verify('dist');
     });
-    await t.test('homepage, checkout, scripts and images are served', async () => {
-      for (const path of ['/', '/index.html', '/login.html', '/register.html', '/checkout.html?plan=supporter', '/js/membership.js', '/css/style.css', '/images/hero.jpg']) {
+    await t.test('homepage, registration, scripts and images are served', async () => {
+      for (const path of ['/', '/index.html', '/login.html', '/register.html', '/js/membership.js', '/css/style.css', '/images/hero.jpg']) {
         const response = await get(path);
         assert.equal(response.status, 200, path);
         assert.equal(response.headers.get('x-frame-options'), 'DENY');
@@ -35,7 +35,7 @@ test('Cloudflare packaging and request handling in the Workers runtime', { timeo
       }
     });
     await t.test('private pages and encoded aliases enforce account and role checks', async () => {
-      for (const path of ['/admin', '/admin.html', '/admin%2ehtml', '/dashboard', '/dashboard.html', '/dashboard%2ehtml']) {
+      for (const path of ['/admin', '/admin.html', '/admin%2ehtml', '/dashboard', '/dashboard.html', '/dashboard%2ehtml', '/checkout', '/checkout.html?plan=supporter', '/checkout%2ehtml']) {
         const response = await get(path);
         assert.equal(response.status, 302, path);
         assert.equal(response.headers.get('location'), '/login.html');
@@ -43,7 +43,8 @@ test('Cloudflare packaging and request handling in the Workers runtime', { timeo
       assert.equal((await get('/admin.html', { headers: cookie })).status, 403);
       assert.equal((await get('/admin.html?fixture=admin', { headers: cookie })).status, 200);
       assert.equal((await get('/dashboard.html', { headers: cookie })).status, 200);
-      assert.equal((await get('/dashboard.html?fixture=pending', { headers: cookie })).headers.get('location'), '/checkout.html?plan=supporter');
+      assert.equal((await get('/dashboard.html?fixture=pending', { headers: cookie })).status, 200);
+      assert.equal((await get('/checkout.html?fixture=pending&plan=supporter', { headers: cookie })).status, 200);
     });
     await t.test('background video is served as MP4 and supports partial playback requests', async () => {
       const video = await readFile('videos/dashboard-background.mp4');

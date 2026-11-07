@@ -1,5 +1,3 @@
-import { plans, formatPrice } from './membership.js';
-
 export function initAuth(options = {}) {
   const window = options.window || globalThis.window;
   const document = window.document;
@@ -7,17 +5,6 @@ export function initAuth(options = {}) {
   const navigate = options.navigate || (href => window.location.assign(href));
   const form = document.querySelector('form');
   const registering = form.id === 'register-form';
-  if (registering) {
-    const select = document.querySelector('#registration-plan');
-    for (const plan of plans) {
-      const option = document.createElement('option');
-      option.value = plan.id;
-      option.textContent = `${plan.name} — ${formatPrice(plan.price)}/month`;
-      select.append(option);
-    }
-    const requested = new URLSearchParams(window.location.search).get('plan');
-    if (plans.some(plan => plan.id === requested)) select.value = requested;
-  }
   const status = document.querySelector('#login-status');
   const button = document.querySelector('#login-btn');
   const spinner = document.querySelector('#login-spinner');
@@ -74,7 +61,6 @@ export function initAuth(options = {}) {
       if (registering) {
         body.name = document.querySelector('#name').value.trim();
         body.adultConfirmed = document.querySelector('#adult-confirmed').checked;
-        body.planId = document.querySelector('#registration-plan').value;
         for (const field of ['bio', 'fantasies', 'boundaries']) body[field] = document.getElementById(field).value.trim();
       }
       const response = await request(registering ? '/api/register' : '/api/login', {
@@ -83,9 +69,7 @@ export function initAuth(options = {}) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Unable to sign in. Please try again.');
       form.reset();
-      const selectedPlan = result.user?.selectedPlan || body.planId;
-      const checkout = `checkout.html${selectedPlan ? '?plan=' + encodeURIComponent(selectedPlan) : ''}`;
-      navigate(result.user?.role === 'admin' ? 'admin.html' : registering || result.user?.tier === 'observer' ? checkout : 'dashboard.html');
+      navigate(result.user?.role === 'admin' ? 'admin.html' : 'dashboard.html');
     } catch (error) {
       status.className = 'error';
       status.textContent = error instanceof SyntaxError || error instanceof TypeError ? 'Unable to reach the account service. Please try again.' : error.message;

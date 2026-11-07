@@ -56,8 +56,9 @@ export function createWorker({ connectDatabase = openDatabase } = {}) {
       catch { return new Response('Not found.', { status: 404, headers: securityHeaders }); }
       if (path === '/admin') path = '/admin.html';
       if (path === '/dashboard') path = '/dashboard.html';
+      if (path === '/checkout') path = '/checkout.html';
       if (path === '/') path = '/index.html';
-      const privateRoute = path.startsWith('/api/') || ['/dashboard.html', '/admin.html'].includes(path);
+      const privateRoute = path.startsWith('/api/') || ['/dashboard.html', '/admin.html', '/checkout.html'].includes(path);
       if ((!privateRoute && !/^\/(index|login|register|checkout)\.html$/.test(path)
         && !/^\/(css|js|images|videos)\/[a-zA-Z0-9_./-]+$/.test(path))
         || path.split('/').some(segment => segment.startsWith('.')) || path.includes('\\')) {
