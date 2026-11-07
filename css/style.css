@@ -524,9 +524,9 @@ h1 span { color: var(--ivory); }
   .home-page .membership-intro .button { grid-column: 2; justify-self: start; }
 }
 
-/* Keep the complete About portrait compact and aligned with its copy. */
+/* Let the complete About portrait fill its column at every screen size. */
 .home-page .about-section {
-  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: 28px;
   padding-inline: max(5vw, 24px);
@@ -541,7 +541,7 @@ h1 span { color: var(--ivory); }
   width: 100%;
   height: auto;
   min-height: 0;
-  max-height: 320px;
+  max-height: none;
   object-fit: contain;
   object-position: center top;
 }
@@ -553,8 +553,6 @@ h1 span { color: var(--ivory); }
 .home-page .membership-section, .home-page .about-section, .home-page .qa-section, .home-page .cta-section { background-color: transparent; }
 .home-page main section[id] { scroll-margin-top: 92px; }
 .home-video-toggle { position: fixed; z-index: 90; right: 18px; bottom: 18px; box-shadow: 0 4px 20px #0008; }
-@media (max-width: 679px) {
+@media (max-width: 900px) {
   .home-page .about-section { grid-template-columns: 1fr; gap: 20px; padding-inline: 20px; }
-  .home-page .about-art { max-width: 240px; justify-self: center; }
-  .home-page .about-art img { max-height: 260px; }
 }
